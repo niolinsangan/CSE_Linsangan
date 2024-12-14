@@ -127,6 +127,16 @@ users = {
     }
 }
 
+# Ensure default admin credentials are present
+if 'admin' not in users:
+    users['admin'] = {
+        'password': 'admin123',
+        'role': 'admin',
+        'user_id': 1,
+        'email': 'admin@example.com',
+        'created_at': datetime.now(timezone.utc)
+    }
+
 # Function to establish a connection to the MySQL database
 def get_db_connection():
     """
