@@ -14,7 +14,10 @@ def client():
     with app.test_client() as client:
         yield client
 
-#fix later 
+
+
+iifififif
+
 
 @pytest.fixture(scope='session')
 def test_db():
