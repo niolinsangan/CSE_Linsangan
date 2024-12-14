@@ -574,7 +574,7 @@ def create_table_view(data, title):
             const actionColumns = document.getElementsByClassName('action-column');
             
             // Pagination variables
-            const rowsPerPage = 25;
+            const rowsPerPage = 5;
             const rows = Array.from(document.getElementById('tableBody').getElementsByTagName('tr'));
             let currentPage = 1;
             const totalPages = Math.ceil(rows.length / rowsPerPage);
