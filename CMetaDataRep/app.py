@@ -152,6 +152,34 @@ def get_db_connection():
         cursorclass=pymysql.cursors.DictCursor  # Ensures that results are returned as dictionaries
     )
 
+# Add this function to handle database operations
+def execute_query(query, params=None, fetch=False):
+    """
+    Executes a SQL query with optional parameters
+    Args:
+        query: SQL query string
+        params: Tuple of parameters for the query
+        fetch: Boolean indicating whether to fetch results
+    Returns:
+        List of results if fetch is True, otherwise None
+    """
+    connection = None
+    try:
+        connection = get_db_connection()
+        with connection.cursor() as cursor:
+            cursor.execute(query, params)
+            if fetch:
+                return cursor.fetchall()
+            connection.commit()
+    except Exception as e:
+        print(f"Database error: {e}")  # Debug print
+        if connection:
+            connection.rollback()
+        raise
+    finally:
+        if connection:
+            connection.close()
+
 # ===================================
 # VIEW TEMPLATE GENERATORS
 # ===================================
@@ -299,7 +327,6 @@ def home():
                     <a href="/Entity">Entity</a>
                     <a href="/Glossary-of-Business-Terms">Glossary of Business Terms</a>
                     <a href="/Source-Systems">Source Systems</a>
-                    <a href="/manage">Manage Data</a>
                     <a href="/login">Login</a>
                 </nav>
             </div>
@@ -851,24 +878,16 @@ def add_attribute():
         return jsonify({'error': 'Missing required fields'}), 400
 
     try:
-        connection = get_db_connection()
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                INSERT INTO attribute (attribute_id, attribute_name, attribute_datatype, 
-                                     attribute_description, typical_values, validation_criteria)
-                VALUES (%s, %s, %s, %s, %s, %s)
-            """, (data['attribute_id'], data['attribute_name'], data['attribute_datatype'],
-                 data.get('attribute_description'), data.get('typical_values'),
-                 data.get('validation_criteria')))
-            connection.commit()
-            print("Attribute added successfully")  # Debug print
+        execute_query("""
+            INSERT INTO attribute (attribute_id, attribute_name, attribute_datatype, 
+                                   attribute_description, typical_values, validation_criteria)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, (data['attribute_id'], data['attribute_name'], data['attribute_datatype'],
+              data.get('attribute_description'), data.get('typical_values'),
+              data.get('validation_criteria')))
         return jsonify({'message': 'Attribute added successfully'}), 201
     except Exception as e:
-        print(f"Error adding attribute: {e}")  # Debug print
         return jsonify({'error': str(e)}), 500
-    finally:
-        if connection:
-            connection.close()
 
 @app.route('/Attribute/<int:id>', methods=['PUT'])
 @jwt_required
@@ -882,28 +901,22 @@ def update_attribute(id):
     """
     data = request.json
     try:
-        connection = get_db_connection()
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT * FROM attribute WHERE attribute_id = %s", (id,))
-            if not cursor.fetchone():
-                return jsonify({'error': 'Attribute not found'}), 404
-            
-            cursor.execute("""
-                UPDATE attribute 
-                SET attribute_name = %s, attribute_datatype = %s,
-                    attribute_description = %s, typical_values = %s,
-                    validation_criteria = %s
-                WHERE attribute_id = %s
-            """, (data['attribute_name'], data['attribute_datatype'],
-                 data.get('attribute_description'), data.get('typical_values'),
-                 data.get('validation_criteria'), id))
-            connection.commit()
+        result = execute_query("SELECT * FROM attribute WHERE attribute_id = %s", (id,), fetch=True)
+        if not result:
+            return jsonify({'error': 'Attribute not found'}), 404
+        
+        execute_query("""
+            UPDATE attribute 
+            SET attribute_name = %s, attribute_datatype = %s,
+                attribute_description = %s, typical_values = %s,
+                validation_criteria = %s
+            WHERE attribute_id = %s
+        """, (data['attribute_name'], data['attribute_datatype'],
+              data.get('attribute_description'), data.get('typical_values'),
+              data.get('validation_criteria'), id))
         return jsonify({'message': 'Attribute updated successfully'}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-    finally:
-        if connection:
-            connection.close()
 
 @app.route('/Attribute/<int:id>', methods=['DELETE'])
 @jwt_required
@@ -916,20 +929,14 @@ def delete_attribute(id):
         JSON: Success/error message
     """
     try:
-        connection = get_db_connection()
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT * FROM attribute WHERE attribute_id = %s", (id,))
-            if not cursor.fetchone():
-                return jsonify({'error': 'Attribute not found'}), 404
-            
-            cursor.execute("DELETE FROM attribute WHERE attribute_id = %s", (id,))
-            connection.commit()
+        result = execute_query("SELECT * FROM attribute WHERE attribute_id = %s", (id,), fetch=True)
+        if not result:
+            return jsonify({'error': 'Attribute not found'}), 404
+        
+        execute_query("DELETE FROM attribute WHERE attribute_id = %s", (id,))
         return jsonify({'message': 'Attribute deleted successfully'}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-    finally:
-        if connection:
-            connection.close()
 
 # ===================================
 # BUSINESS TERM OWNER CRUD OPERATIONS
@@ -949,19 +956,13 @@ def add_business_term_owner():
         return jsonify({'error': 'Missing required fields'}), 400
 
     try:
-        connection = get_db_connection()
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                INSERT INTO business_term_owner (term_owner_code, term_owner_description)
-                VALUES (%s, %s)
-            """, (data['term_owner_code'], data['term_owner_description']))
-            connection.commit()
+        execute_query("""
+            INSERT INTO business_term_owner (term_owner_code, term_owner_description)
+            VALUES (%s, %s)
+        """, (data['term_owner_code'], data['term_owner_description']))
         return jsonify({'message': 'Business Term Owner added successfully'}), 201
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-    finally:
-        if connection:
-            connection.close()
 
 @app.route('/Business-Term-Owner/<string:code>', methods=['PUT'])
 @jwt_required
@@ -975,24 +976,18 @@ def update_business_term_owner(code):
     """
     data = request.json
     try:
-        connection = get_db_connection()
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT * FROM business_term_owner WHERE term_owner_code = %s", (code,))
-            if not cursor.fetchone():
-                return jsonify({'error': 'Business Term Owner not found'}), 404
-            
-            cursor.execute("""
-                UPDATE business_term_owner 
-                SET term_owner_description = %s
-                WHERE term_owner_code = %s
-            """, (data['term_owner_description'], code))
-            connection.commit()
+        result = execute_query("SELECT * FROM business_term_owner WHERE term_owner_code = %s", (code,), fetch=True)
+        if not result:
+            return jsonify({'error': 'Business Term Owner not found'}), 404
+        
+        execute_query("""
+            UPDATE business_term_owner 
+            SET term_owner_description = %s
+            WHERE term_owner_code = %s
+        """, (data['term_owner_description'], code))
         return jsonify({'message': 'Business Term Owner updated successfully'}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-    finally:
-        if connection:
-            connection.close()
 
 @app.route('/Business-Term-Owner/<string:code>', methods=['DELETE'])
 @jwt_required
@@ -1005,20 +1000,14 @@ def delete_business_term_owner(code):
         JSON: Success/error message
     """
     try:
-        connection = get_db_connection()
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT * FROM business_term_owner WHERE term_owner_code = %s", (code,))
-            if not cursor.fetchone():
-                return jsonify({'error': 'Business Term Owner not found'}), 404
-            
-            cursor.execute("DELETE FROM business_term_owner WHERE term_owner_code = %s", (code,))
-            connection.commit()
+        result = execute_query("SELECT * FROM business_term_owner WHERE term_owner_code = %s", (code,), fetch=True)
+        if not result:
+            return jsonify({'error': 'Business Term Owner not found'}), 404
+        
+        execute_query("DELETE FROM business_term_owner WHERE term_owner_code = %s", (code,))
         return jsonify({'message': 'Business Term Owner deleted successfully'}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-    finally:
-        if connection:
-            connection.close()
 
 # ===================================
 # ENTITY CRUD OPERATIONS
@@ -1038,19 +1027,13 @@ def add_entity():
         return jsonify({'error': 'Missing required fields'}), 400
 
     try:
-        connection = get_db_connection()
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                INSERT INTO entity (entity_id, entity_name, entity_description)
-                VALUES (%s, %s, %s)
-            """, (data['entity_id'], data['entity_name'], data.get('entity_description')))
-            connection.commit()
+        execute_query("""
+            INSERT INTO entity (entity_id, entity_name, entity_description)
+            VALUES (%s, %s, %s)
+        """, (data['entity_id'], data['entity_name'], data.get('entity_description')))
         return jsonify({'message': 'Entity added successfully'}), 201
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-    finally:
-        if connection:
-            connection.close()
 
 @app.route('/Entity/<int:id>', methods=['PUT'])
 @jwt_required
@@ -1064,24 +1047,18 @@ def update_entity(id):
     """
     data = request.json
     try:
-        connection = get_db_connection()
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT * FROM entity WHERE entity_id = %s", (id,))
-            if not cursor.fetchone():
-                return jsonify({'error': 'Entity not found'}), 404
-            
-            cursor.execute("""
-                UPDATE entity 
-                SET entity_name = %s, entity_description = %s
-                WHERE entity_id = %s
-            """, (data['entity_name'], data.get('entity_description'), id))
-            connection.commit()
+        result = execute_query("SELECT * FROM entity WHERE entity_id = %s", (id,), fetch=True)
+        if not result:
+            return jsonify({'error': 'Entity not found'}), 404
+        
+        execute_query("""
+            UPDATE entity 
+            SET entity_name = %s, entity_description = %s
+            WHERE entity_id = %s
+        """, (data['entity_name'], data.get('entity_description'), id))
         return jsonify({'message': 'Entity updated successfully'}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-    finally:
-        if connection:
-            connection.close()
 
 @app.route('/Entity/<int:id>', methods=['DELETE'])
 @jwt_required
@@ -1094,20 +1071,14 @@ def delete_entity(id):
         JSON: Success/error message
     """
     try:
-        connection = get_db_connection()
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT * FROM entity WHERE entity_id = %s", (id,))
-            if not cursor.fetchone():
-                return jsonify({'error': 'Entity not found'}), 404
-            
-            cursor.execute("DELETE FROM entity WHERE entity_id = %s", (id,))
-            connection.commit()
+        result = execute_query("SELECT * FROM entity WHERE entity_id = %s", (id,), fetch=True)
+        if not result:
+            return jsonify({'error': 'Entity not found'}), 404
+        
+        execute_query("DELETE FROM entity WHERE entity_id = %s", (id,))
         return jsonify({'message': 'Entity deleted successfully'}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-    finally:
-        if connection:
-            connection.close()
 
 # ===================================
 # GLOSSARY CRUD OPERATIONS
@@ -1214,20 +1185,14 @@ def add_source_system():
     """
     data = request.json
     try:
-        connection = get_db_connection()
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                INSERT INTO source_systems 
-                (src_system_id, src_system_name)
-                VALUES (%s, %s)
-            """, (data['src_system_id'], data['src_system_name']))
-            connection.commit()
+        execute_query("""
+            INSERT INTO source_systems 
+            (src_system_id, src_system_name)
+            VALUES (%s, %s)
+        """, (data['src_system_id'], data['src_system_name']))
         return jsonify({'message': 'Source system added successfully'}), 201
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-    finally:
-        if connection:
-            connection.close()
 
 # ===================================
 # FORM GENERATORS
@@ -1318,6 +1283,11 @@ def create_login_form():
                 10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
                 20%, 40%, 60%, 80% { transform: translateX(5px); }
             }
+            .logged-in-message {
+                text-align: center;
+                margin-top: 20px;
+                color: #28a745;
+            }
         </style>
     </head>
     <body>
@@ -1337,68 +1307,63 @@ def create_login_form():
             </form>
             <a href="/register" class="back-link">Need an account? Register</a>
             <a href="/" class="back-link">← Back to Home</a>
+            <div id="loggedInMessage" class="logged-in-message" style="display: none;">
+                You are already logged in.
+            </div>
         </div>
         <script>
             const token = localStorage.getItem('token');
-            if (token) {{
-                fetch('/Attribute', {{
-                    headers: {{
-                        'Authorization': 'Bearer ' + token
-                    }}
-                }})
-                .then(response => {{
-                    if (response.ok) {{
-                        window.history.back();
-                    }} else {{
-                        localStorage.removeItem('token');
-                    }}
-                }});
-            }}
+            const loggedInMessage = document.getElementById('loggedInMessage');
+            const loginForm = document.getElementById('loginForm');
 
-            document.getElementById('loginForm').addEventListener('submit', async (e) => {{
+            if (token) {
+                loggedInMessage.style.display = 'block';
+                loginForm.style.display = 'none';
+            }
+
+            loginForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const errorMessage = document.getElementById('errorMessage');
-                const form = document.getElementById('loginForm');
                 errorMessage.style.display = 'none';
                 
-                try {{
-                    const response = await fetch('/login', {{
+                try {
+                    const response = await fetch('/login', {
                         method: 'POST',
-                        headers: {{
+                        headers: {
                             'Content-Type': 'application/json',
-                        }},
-                        body: JSON.stringify({{
+                        },
+                        body: JSON.stringify({
                             username: document.getElementById('username').value,
                             password: document.getElementById('password').value
-                        }})
-                    }});
+                        })
+                    });
                     
                     const data = await response.json();
                     
-                    if (response.ok && data.token) {{
+                    if (response.ok && data.token) {
                         localStorage.setItem('token', data.token);
-                        if (document.referrer && !document.referrer.includes('/login')) {{
+                        if (document.referrer && !document.referrer.includes('/login')) {
                             window.location.href = document.referrer;
-                        }} else {{
+                        } else {
                             window.location.href = '/';
-                        }}
-                    }} else {{
+                        }
+                    } else {
                         errorMessage.textContent = data.error || 'Login failed';
                         errorMessage.style.display = 'block';
-                        form.classList.add('shake');
-                        setTimeout(() => form.classList.remove('shake'), 500);
+                        loginForm.classList.add('shake');
+                        setTimeout(() => loginForm.classList.remove('shake'), 500);
                         
                         // Clear password field on error
                         document.getElementById('password').value = '';
                         document.getElementById('password').focus();
-                    }}
-                }} catch (error) {{
+                    }
+                } catch (error) {
                     errorMessage.textContent = 'An error occurred. Please try again.';
                     errorMessage.style.display = 'block';
-                    form.classList.add('shake');
-                    setTimeout(() => form.classList.remove('shake'), 500);
-                }}
-            }});
+                    loginForm.classList.add('shake');
+                    setTimeout(() => loginForm.classList.remove('shake'), 500);
+                }
+            });
         </script>
     </body>
     </html>
@@ -1590,124 +1555,7 @@ def register():
         except Exception as e:
             return jsonify({'error': str(e)}), 500
 
-# Add this new route for data management
-@app.route('/manage')
-def manage_data():
-    return """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Data Management</title>
-        <style>
-            body {
-                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                margin: 0;
-                padding: 20px;
-                background-color: #f5f5f5;
-            }
-            .container {
-                max-width: 1200px;
-                margin: 0 auto;
-                background-color: white;
-                padding: 20px;
-                border-radius: 8px;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            }
-            h2 {
-                color: #007bff;
-                margin-bottom: 20px;
-            }
-            .crud-section {
-                margin-bottom: 30px;
-                padding: 20px;
-                border: 1px solid #ddd;
-                border-radius: 8px;
-            }
-            .crud-buttons {
-                margin-top: 10px;
-            }
-            .btn {
-                padding: 8px 16px;
-                margin-right: 10px;
-                border: none;
-                border-radius: 4px;
-                cursor: pointer;
-                font-size: 14px;
-            }
-            .btn-add {
-                background-color: #28a745;
-                color: white;
-            }
-            .btn-view {
-                background-color: #007bff;
-                color: white;
-            }
-            .btn-edit {
-                background-color: #ffc107;
-                color: black;
-            }
-            .btn-delete {
-                background-color: #dc3545;
-                color: white;
-            }
-            .back-link {
-                display: inline-block;
-                margin-top: 20px;
-                color: #007bff;
-                text-decoration: none;
-            }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h2>Data Management</h2>
-            
-            <div class="crud-section">
-                <h3>Attributes</h3>
-                <div class="crud-buttons">
-                    <button class="btn btn-add" onclick="location.href='/Attribute/add'">Add New</button>
-                    <button class="btn btn-view" onclick="location.href='/Attribute'">View All</button>
-                </div>
-            </div>
-
-            <div class="crud-section">
-                <h3>Business Term Owners</h3>
-                <div class="crud-buttons">
-                    <button class="btn btn-add" onclick="location.href='/Business-Term-Owner/add'">Add New</button>
-                    <button class="btn btn-view" onclick="location.href='/Business-Term-Owner'">View All</button>
-                </div>
-            </div>
-
-            <div class="crud-section">
-                <h3>Entities</h3>
-                <div class="crud-buttons">
-                    <button class="btn btn-add" onclick="location.href='/Entity/add'">Add New</button>
-                    <button class="btn btn-view" onclick="location.href='/Entity'">View All</button>
-                </div>
-            </div>
-
-            <div class="crud-section">
-                <h3>Glossary of Business Terms</h3>
-                <div class="crud-buttons">
-                    <button class="btn btn-add" onclick="location.href='/Glossary-of-Business-Terms/add'">Add New</button>
-                    <button class="btn btn-view" onclick="location.href='/Glossary-of-Business-Terms'">View All</button>
-                </div>
-            </div>
-
-            <div class="crud-section">
-                <h3>Source Systems</h3>
-                <div class="crud-buttons">
-                    <button class="btn btn-add" onclick="location.href='/Source-Systems/add'">Add New</button>
-                    <button class="btn btn-view" onclick="location.href='/Source-Systems'">View All</button>
-                </div>
-            </div>
-
-            <a href="/" class="back-link">← Back to Home</a>
-        </div>
-    </body>
-    </html>
-    """
-
+#
 # Add these routes for CRUD operations
 @app.route('/Attribute/add', methods=['GET'])
 def add_attribute_form():
@@ -1810,7 +1658,7 @@ def add_attribute_form():
                         <label for="validation_criteria">Validation Criteria:</label>
                         <input type="text" id="validation_criteria" name="validation_criteria">
                     </div>
-                    <button type="submit" class="btn btn-primary">Save</button>
+                  <button type="submit" class="btn btn-primary">Save</button>
                     <button type="button" class="btn btn-secondary" onclick="history.back()">Cancel</button>
                 </form>
             </div>
