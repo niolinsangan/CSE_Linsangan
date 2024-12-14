@@ -14,6 +14,8 @@ def client():
     with app.test_client() as client:
         yield client
 
+#fix later 
+
 @pytest.fixture(scope='session')
 def test_db():
     """Create a database connection for testing"""
