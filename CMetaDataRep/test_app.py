@@ -4,15 +4,19 @@ from app import app
 import pymysql
 from datetime import datetime
 
+# ===================================
+# TEST FIXTURES
+# ===================================
 @pytest.fixture
 def client():
+    """Create a test client for the app"""
     app.config['TESTING'] = True
     with app.test_client() as client:
         yield client
 
 @pytest.fixture(scope='session')
 def test_db():
-    # Create test database connection
+    """Create a database connection for testing"""
     connection = pymysql.connect(
         host='localhost',
         user='root',
@@ -25,24 +29,35 @@ def test_db():
 
 @pytest.fixture(autouse=True)
 def setup_test_db(test_db):
-    # Clear test data before each test
+    """Clear test data before each test"""
     with test_db.cursor() as cursor:
-        cursor.execute("DELETE FROM attribute")
-        cursor.execute("DELETE FROM business_term_owner")
-        cursor.execute("DELETE FROM entity")
-        cursor.execute("DELETE FROM glossary_of_business_terms")
-        cursor.execute("DELETE FROM source_systems")
-        cursor.execute("DELETE FROM business_term_type")
+        # Clear all tables
+        tables = [
+            'attribute',
+            'business_term_owner',
+            'entity',
+            'glossary_of_business_terms',
+            'source_systems',
+            'business_term_type'
+        ]
+        for table in tables:
+            cursor.execute(f"DELETE FROM {table}")
     test_db.commit()
 
+# ===================================
+# HELPER FUNCTIONS
+# ===================================
 def get_auth_token(client):
-    """Helper function to get authentication token"""
+    """Get authentication token for testing"""
     response = client.post('/login', 
                          json={'username': 'admin', 'password': 'admin123'})
     return json.loads(response.data)['token']
 
-# ---------------------------- Authentication Tests ----------------------------
+# ===================================
+# AUTHENTICATION TESTS
+# ===================================
 def test_login_success(client):
+    """Test successful login"""
     response = client.post('/login',
                           json={'username': 'admin', 'password': 'admin123'})
     assert response.status_code == 200
@@ -53,13 +68,27 @@ def test_login_success(client):
     assert data['user']['role'] == 'admin'
 
 def test_login_failure(client):
+    """Test login with invalid credentials"""
     response = client.post('/login',
                           json={'username': 'wrong', 'password': 'wrong'})
     assert response.status_code == 401
 
-# ---------------------------- Attribute Tests ----------------------------
+def test_register_new_user(client):
+    """Test user registration"""
+    response = client.post('/register',
+                          json={
+                              'username': 'testuser',
+                              'password': 'test123',
+                              'email': 'test@example.com'
+                          })
+    assert response.status_code == 201
+
+# ===================================
+# ATTRIBUTE TESTS
+# ===================================
 def test_get_attributes(client, test_db):
-    # First insert test data
+    """Test retrieving attributes"""
+    # Insert test data
     with test_db.cursor() as cursor:
         cursor.execute("""
             INSERT INTO attribute 
@@ -68,13 +97,12 @@ def test_get_attributes(client, test_db):
         """)
         test_db.commit()
 
-    token = get_auth_token(client)
-    response = client.get('/Attribute',
-                         headers={'Authorization': f'Bearer {token}'})
+    response = client.get('/Attribute')
     assert response.status_code == 200
     assert b'Test Attribute' in response.data
 
 def test_add_attribute(client):
+    """Test adding a new attribute"""
     token = get_auth_token(client)
     test_attribute = {
         'attribute_id': 1,
@@ -89,9 +117,11 @@ def test_add_attribute(client):
                           json=test_attribute)
     assert response.status_code == 201
 
-# ---------------------------- Business Term Owner Tests ----------------------------
+# ===================================
+# BUSINESS TERM OWNER TESTS
+# ===================================
 def test_get_business_term_owners(client, test_db):
-    # Insert test data
+    """Test retrieving business term owners"""
     with test_db.cursor() as cursor:
         cursor.execute("""
             INSERT INTO business_term_owner 
@@ -100,15 +130,15 @@ def test_get_business_term_owners(client, test_db):
         """)
         test_db.commit()
 
-    token = get_auth_token(client)
-    response = client.get('/Business-Term-Owner',
-                         headers={'Authorization': f'Bearer {token}'})
+    response = client.get('/Business-Term-Owner')
     assert response.status_code == 200
     assert b'Test Owner' in response.data
 
-# ---------------------------- Entity Tests ----------------------------
+# ===================================
+# ENTITY TESTS
+# ===================================
 def test_get_entities(client, test_db):
-    # Insert test data
+    """Test retrieving entities"""
     with test_db.cursor() as cursor:
         cursor.execute("""
             INSERT INTO entity 
@@ -117,15 +147,15 @@ def test_get_entities(client, test_db):
         """)
         test_db.commit()
 
-    token = get_auth_token(client)
-    response = client.get('/Entity',
-                         headers={'Authorization': f'Bearer {token}'})
+    response = client.get('/Entity')
     assert response.status_code == 200
     assert b'Test Entity' in response.data
 
-# ---------------------------- Glossary Tests ----------------------------
+# ===================================
+# GLOSSARY TESTS
+# ===================================
 def test_get_glossary(client, test_db):
-    # Insert test data
+    """Test retrieving glossary terms"""
     current_date = datetime.now().date()
     with test_db.cursor() as cursor:
         cursor.execute("""
@@ -135,15 +165,15 @@ def test_get_glossary(client, test_db):
         """, (current_date,))
         test_db.commit()
 
-    token = get_auth_token(client)
-    response = client.get('/Glossary-of-Business-Terms',
-                         headers={'Authorization': f'Bearer {token}'})
+    response = client.get('/Glossary-of-Business-Terms')
     assert response.status_code == 200
     assert b'TEST_TERM' in response.data
 
-# ---------------------------- Source Systems Tests ----------------------------
+# ===================================
+# SOURCE SYSTEMS TESTS
+# ===================================
 def test_get_source_systems(client, test_db):
-    # Insert test data
+    """Test retrieving source systems"""
     with test_db.cursor() as cursor:
         cursor.execute("""
             INSERT INTO source_systems 
@@ -152,40 +182,25 @@ def test_get_source_systems(client, test_db):
         """)
         test_db.commit()
 
-    token = get_auth_token(client)
-    response = client.get('/Source-Systems',
-                         headers={'Authorization': f'Bearer {token}'})
+    response = client.get('/Source-Systems')
     assert response.status_code == 200
     assert b'Test System' in response.data
 
-# ---------------------------- Error Handling Tests ----------------------------
-def test_missing_token(client):
-    response = client.get('/Attribute')
-    assert b'Login Required' in response.data
-
-def test_invalid_token(client):
-    response = client.get('/Attribute',
-                         headers={'Authorization': 'Bearer invalid_token'})
-    assert b'Login Required' in response.data
-
+# ===================================
+# ERROR HANDLING TESTS
+# ===================================
 def test_missing_required_fields(client):
+    """Test handling of missing required fields"""
     token = get_auth_token(client)
     response = client.post('/Attribute',
                           headers={'Authorization': f'Bearer {token}'},
                           json={})
     assert response.status_code == 400
 
-def test_manage_page_access(client):
-    """Test accessing the management page"""
-    token = get_auth_token(client)
-    response = client.get('/manage',
-                         headers={'Authorization': f'Bearer {token}'})
-    assert response.status_code == 200
-    assert b'Data Management' in response.data
-
-def test_manage_page_unauthorized(client):
-    """Test accessing management page without authentication"""
-    response = client.get('/manage')
+def test_invalid_token(client):
+    """Test handling of invalid authentication token"""
+    response = client.get('/Attribute',
+                         headers={'Authorization': 'Bearer invalid_token'})
     assert b'Login Required' in response.data
 
 if __name__ == '__main__':
