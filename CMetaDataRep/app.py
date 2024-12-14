@@ -32,9 +32,11 @@ def create_jwt(user_id, role):
 def decode_jwt(token):
     try:
         return jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
-    except jwt.exceptions.ExpiredSignatureError:
+    
+    except jwt.ExpiredSignatureError:
         return {'error': 'Token expired'}
-    except jwt.exceptions.InvalidTokenError:
+    
+    except jwt.InvalidTokenError:
         return {'error': 'Invalid token'}
 
 # Decorator to protect routes with optional role-based access control
@@ -51,9 +53,9 @@ def jwt_required(f):
             decoded_token = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
             request.user = decoded_token
             return f(*args, **kwargs)
-        except jwt.exceptions.ExpiredSignatureError:
+        except jwt.ExpiredSignatureError:
             return create_login_form()
-        except jwt.exceptions.InvalidTokenError:
+        except jwt.InvalidTokenError:
             return create_login_form()
             
     return decorated_function
@@ -242,6 +244,7 @@ def home():
                     <a href="/Entity">Entity</a>
                     <a href="/Glossary-of-Business-Terms">Glossary of Business Terms</a>
                     <a href="/Source-Systems">Source Systems</a>
+                    <a href="/manage">Manage Data</a>
                     <a href="/login">Login</a>
                 </nav>
             </div>
@@ -350,6 +353,25 @@ def create_table_view(data, title):
             tr:hover {{
                 background-color: #f2f2f2;
             }}
+            .back-link {{
+                display: inline-block;
+                margin-top: 20px;
+                color: #007bff;
+                text-decoration: none;
+            }}
+            .back-link:hover {{
+                text-decoration: underline;
+            }}
+            .error-message {{
+                color: #dc3545;
+                margin-top: 20px;
+                display: none;
+            }}
+            
+            .crud-buttons {{
+                margin: 20px 0;
+            }}
+            
             .btn {{
                 padding: 8px 16px;
                 margin-right: 10px;
@@ -358,26 +380,55 @@ def create_table_view(data, title):
                 cursor: pointer;
                 font-size: 14px;
             }}
+            
             .btn-add {{
                 background-color: #28a745;
                 color: white;
             }}
+            
             .btn-edit {{
                 background-color: #ffc107;
-                color: black;
+                color: #000;
             }}
+            
             .btn-delete {{
                 background-color: #dc3545;
                 color: white;
             }}
-            .back-link {{
-                display: inline-block;
+            
+            .modal {{
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background-color: rgba(0,0,0,0.5);
+            }}
+            
+            .modal-content {{
+                background-color: white;
+                margin: 15% auto;
+                padding: 20px;
+                width: 400px;
+                border-radius: 8px;
+                text-align: center;
+            }}
+            
+            .modal-buttons {{
                 margin-top: 20px;
                 color: #007bff;
                 text-decoration: none;
             }}
-            .crud-buttons {{
-                margin: 20px 0;
+            
+            .btn-confirm {{
+                background-color: #dc3545;
+                color: white;
+            }}
+            
+            .btn-cancel {{
+                background-color: #6c757d;
+                color: white;
             }}
         </style>
     </head>
@@ -386,64 +437,93 @@ def create_table_view(data, title):
             <h2>{title}</h2>
             
             <div class="crud-buttons">
-                <button class="btn btn-add" onclick="location.href='{request.path}/add'">Add New</button>
+                <button class="btn btn-add" onclick="location.href='{get_add_url(title)}'">Add New</button>
             </div>
 
-            <table>
-                <thead>
-                    <tr>
-                        {''.join(f'<th>{header}</th>' for header in headers)}
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {''.join(
-                        f"<tr>"
-                        f"{''.join(f'<td>{str(value)}</td>' for value in row.values())}"
-                        f"<td>"
-                        f"<button class='btn btn-edit' onclick='location.href=\"{request.path}/edit/{row[primary_key]}\"'>Edit</button>"
-                        f"<button class='btn btn-delete' onclick='deleteRecord({json.dumps(row[primary_key])})'>Delete</button>"
-                        f"</td>"
-                        f"</tr>"
-                        for row in data
-                    )}
-                </tbody>
-            </table>
-            
+            <div id="tableContent">
+                <table>
+                    <thead>
+                        <tr>
+                            {''.join(f'<th>{header}</th>' for header in headers)}
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {''.join(
+                            f"<tr>"
+                            f"{''.join(f'<td>{str(value)}</td>' for value in row.values())}"
+                            f"<td>"
+                            f"<button class='btn btn-edit' onclick='editRecord({json.dumps(row)})'>Edit</button>"
+                            f"<button class='btn btn-delete' onclick='showDeleteModal({json.dumps(row[primary_key])})'>Delete</button>"
+                            f"</td>"
+                            f"</tr>"
+                            for row in data
+                        )}
+                    </tbody>
+                </table>
+            </div>
             <a href="/" class="back-link">← Back to Home</a>
         </div>
 
-        <script>
-            // Get token from localStorage
-            const token = localStorage.getItem('token');
+        <!-- Delete Confirmation Modal -->
+        <div id="deleteModal" class="modal">
+            <div class="modal-content">
+                <h3>Confirm Delete</h3>
+                <p>Are you sure you want to delete this record?</p>
+                <div class="modal-buttons">
+                    <button class="btn btn-confirm" onclick="confirmDelete()">Delete</button>
+                    <button class="btn btn-cancel" onclick="hideDeleteModal()">Cancel</button>
+                </div>
+            </div>
+        </div>
 
-            async function deleteRecord(id) {{
-                if (confirm('Are you sure you want to delete this record?')) {{
-                    try {{
-                        const response = await fetch(`${{window.location.pathname}}/${{id}}`, {{
-                            method: 'DELETE',
-                            headers: {{
-                                'Authorization': `Bearer ${{token}}`  // Use token variable
-                            }}
-                        }});
-                        
-                        if (response.ok) {{
-                            window.location.reload();
-                        }} else {{
-                            const error = await response.json();
-                            alert(error.error || 'Failed to delete record');
-                        }}
-                    }} catch (error) {{
-                        alert('An error occurred. Please try again.');
-                    }}
-                }}
+        <script>
+            let recordToDelete = null;
+
+            function showDeleteModal(id) {{
+                recordToDelete = id;
+                document.getElementById('deleteModal').style.display = 'block';
             }}
 
-            // Check if user is authenticated
-            if (!token) {{
-                // Optionally redirect to login
-                // window.location.href = '/login';
-                console.log('No authentication token found');
+            function hideDeleteModal() {{
+                document.getElementById('deleteModal').style.display = 'none';
+                recordToDelete = null;
+            }}
+
+            function confirmDelete() {{
+                if (recordToDelete === null) return;
+
+                fetch(`${{window.location.pathname}}/${{recordToDelete}}`, {{
+                    method: 'DELETE'
+                }})
+                .then(response => {{
+                    if (response.ok) {{
+                        window.location.reload();
+                    }} else {{
+                        response.json().then(data => {{
+                            alert(data.error || 'Failed to delete record');
+                        }});
+                    }}
+                }})
+                .catch(error => {{
+                    alert('Error: ' + error);
+                }})
+                .finally(() => {{
+                    hideDeleteModal();
+                }});
+            }}
+
+            function editRecord(record) {{
+                const url = window.location.pathname + '/edit/' + record['{primary_key}'];
+                window.location.href = url;
+            }}
+
+            // Close modal when clicking outside
+            window.onclick = function(event) {{
+                const modal = document.getElementById('deleteModal');
+                if (event.target === modal) {{
+                    hideDeleteModal();
+                }}
             }}
         </script>
     </body>
@@ -486,8 +566,11 @@ def get_attributes():
 @jwt_required
 def add_attribute():
     data = request.json
-    print(f"Adding attribute: {data}")  # Debug print
-    connection = None
+    required_fields = ['attribute_id', 'attribute_name', 'attribute_datatype']
+    
+    if not all(field in data for field in required_fields):
+        return jsonify({'error': 'Missing required fields'}), 400
+
     try:
         connection = get_db_connection()
         with connection.cursor() as cursor:
@@ -743,33 +826,84 @@ def get_glossary():
         connection = get_db_connection()
         with connection.cursor() as cursor:
             cursor.execute("""
-                SELECT business_term_short_name, date_term_defined 
+                SELECT business_term_short_name, 
+                       DATE_FORMAT(date_term_defined, '%Y-%m-%d') as date_term_defined 
                 FROM glossary_of_business_terms
             """)
             terms = cursor.fetchall()
         return create_table_view(terms, "Glossary of Business Terms")
     except Exception as e:
+        print(f"Error fetching glossary terms: {e}")  # Debug print
         return f"<h1>Error</h1><p>{str(e)}</p>", 500
     finally:
         if connection:
             connection.close()
 
-# POST route to add a new glossary term
 @app.route('/Glossary-of-Business-Terms', methods=['POST'])
 @jwt_required
 def add_glossary_term():
     data = request.json
+    connection = None
     try:
         connection = get_db_connection()
         with connection.cursor() as cursor:
             cursor.execute("""
                 INSERT INTO glossary_of_business_terms 
                 (business_term_short_name, date_term_defined)
-                VALUES (%s, %s)
+                VALUES (%s, STR_TO_DATE(%s, '%Y-%m-%d'))
             """, (data['business_term_short_name'], data['date_term_defined']))
             connection.commit()
         return jsonify({'message': 'Term added successfully'}), 201
     except Exception as e:
+        print(f"Error adding glossary term: {e}")  # Debug print
+        if connection:
+            connection.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if connection:
+            connection.close()
+
+@app.route('/Glossary-of-Business-Terms/<string:name>', methods=['PUT'])
+@jwt_required
+def update_glossary_term(name):
+    data = request.json
+    connection = None
+    try:
+        connection = get_db_connection()
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                UPDATE glossary_of_business_terms 
+                SET date_term_defined = STR_TO_DATE(%s, '%Y-%m-%d')
+                WHERE business_term_short_name = %s
+            """, (data['date_term_defined'], name))
+            connection.commit()
+        return jsonify({'message': 'Term updated successfully'}), 200
+    except Exception as e:
+        print(f"Error updating glossary term: {e}")  # Debug print
+        if connection:
+            connection.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if connection:
+            connection.close()
+
+@app.route('/Glossary-of-Business-Terms/<string:name>', methods=['DELETE'])
+@jwt_required
+def delete_glossary_term(name):
+    connection = None
+    try:
+        connection = get_db_connection()
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                DELETE FROM glossary_of_business_terms 
+                WHERE business_term_short_name = %s
+            """, (name,))
+            connection.commit()
+        return jsonify({'message': 'Term deleted successfully'}), 200
+    except Exception as e:
+        print(f"Error deleting glossary term: {e}")  # Debug print
+        if connection:
+            connection.rollback()
         return jsonify({'error': str(e)}), 500
     finally:
         if connection:
@@ -1320,32 +1454,31 @@ def add_attribute_form():
         </div>
 
         <script>
-            document.getElementById('attributeForm').addEventListener('submit', async (e) => {{
+            document.getElementById('attributeForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const formData = new FormData(e.target);
                 const data = Object.fromEntries(formData);
                 const token = localStorage.getItem('token');
                 
-                try {{
-                    const response = await fetch('/Attribute', {{
+                try {
+                    const response = await fetch('/Attribute', {
                         method: 'POST',
-                        headers: {{
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${token}`
-                        }},
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
                         body: JSON.stringify(data)
-                    }});
+                    });
                     
-                    if (response.ok) {{
+                    if (response.ok) {
                         window.location.href = '/Attribute';
-                    }} else {{
+                    } else {
                         const error = await response.json();
                         alert(error.error || 'Failed to add attribute');
-                    }}
-                }} catch (error) {{
+                    }
+                } catch (error) {
                     alert('An error occurred. Please try again.');
-                }}
-            }});
+                }
+            });
         </script>
     </body>
     </html>
@@ -1444,8 +1577,7 @@ def add_business_term_owner_form():
                     const response = await fetch('/Business-Term-Owner', {
                         method: 'POST',
                         headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${token}`
+                            'Content-Type': 'application/json'
                         },
                         body: JSON.stringify(data)
                     });
@@ -1577,6 +1709,89 @@ def add_source_system_form():
     </html>
     """
 
+# Add this common style for all edit forms
+EDIT_FORM_STYLE = """
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        margin: 20px;
+        background-color: #f5f5f5;
+    }
+    .container {
+        max-width: 600px;
+        margin: 0 auto;
+        background-color: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    h2 {
+        color: #007bff;
+        margin-bottom: 20px;
+    }
+    .form-group {
+        margin-bottom: 15px;
+    }
+    label {
+        display: block;
+        margin-bottom: 5px;
+        color: #666;
+    }
+    input, select, textarea {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        box-sizing: border-box;
+    }
+    .btn {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+        margin-right: 10px;
+    }
+    .btn-primary {
+        background-color: #007bff;
+        color: white;
+    }
+    .btn-primary:hover {
+        background-color: #0056b3;
+    }
+    .btn-secondary {
+        background-color: #6c757d;
+        color: white;
+    }
+    .btn-secondary:hover {
+        background-color: #545b62;
+    }
+    .back-link {
+        display: inline-block;
+        margin-top: 20px;
+        color: #007bff;
+        text-decoration: none;
+    }
+    .back-link:hover {
+        text-decoration: underline;
+    }
+    .nav-links {
+        margin-bottom: 20px;
+    }
+    .nav-links a {
+        color: #007bff;
+        text-decoration: none;
+        margin-right: 15px;
+    }
+    .nav-links a:hover {
+        text-decoration: underline;
+    }
+    .error-message {
+        color: #dc3545;
+        margin-bottom: 10px;
+        display: none;
+    }
+"""
+
 @app.route('/Attribute/edit/<int:id>', methods=['GET'])
 def edit_attribute_form(id):
     connection = None
@@ -1641,15 +1856,40 @@ def edit_attribute_form(id):
                     background-color: #007bff;
                     color: white;
                 }}
+                .btn-primary:hover {{
+                    background-color: #0056b3;
+                }}
                 .btn-secondary {{
                     background-color: #6c757d;
                     color: white;
+                }}
+                .btn-secondary:hover {{
+                    background-color: #545b62;
                 }}
                 .back-link {{
                     display: inline-block;
                     margin-top: 20px;
                     color: #007bff;
                     text-decoration: none;
+                }}
+                .back-link:hover {{
+                    text-decoration: underline;
+                }}
+                .nav-links {{
+                    margin-bottom: 20px;
+                }}
+                .nav-links a {{
+                    color: #007bff;
+                    text-decoration: none;
+                    margin-right: 15px;
+                }}
+                .nav-links a:hover {{
+                    text-decoration: underline;
+                }}
+                .error-message {{
+                    color: #dc3545;
+                    margin-bottom: 10px;
+                    display: none;
                 }}
             </style>
         </head>
@@ -1828,12 +2068,18 @@ def edit_entity_form(id):
         <head>
             <title>Edit Entity</title>
             <style>
-                /* Same styles as attribute edit form */
+                {EDIT_FORM_STYLE}
             </style>
         </head>
         <body>
             <div class="container">
+                <div class="nav-links">
+                    <a href="/">Home</a>
+                    <a href="/Entity">Back to Entities</a>
+                    <a href="/manage">Management</a>
+                </div>
                 <h2>Edit Entity</h2>
+                <p id="errorMessage" class="error-message"></p>
                 <form id="editForm">
                     <div class="form-group">
                         <label for="entity_name">Entity Name:</label>
@@ -1850,35 +2096,6 @@ def edit_entity_form(id):
                 </form>
                 <a href="/manage" class="back-link">← Back to Management</a>
             </div>
-
-            <script>
-                document.getElementById('editForm').addEventListener('submit', async (e) => {{
-                    e.preventDefault();
-                    const formData = new FormData(e.target);
-                    const data = Object.fromEntries(formData);
-                    const token = localStorage.getItem('token');
-                    
-                    try {{
-                        const response = await fetch('/Entity/{id}', {{
-                            method: 'PUT',
-                            headers: {{
-                                'Content-Type': 'application/json',
-                                'Authorization': `Bearer ${{token}}`
-                            }},
-                            body: JSON.stringify(data)
-                        }});
-                        
-                        if (response.ok) {{
-                            window.location.href = '/Entity';
-                        }} else {{
-                            const error = await response.json();
-                            alert(error.error || 'Failed to update entity');
-                        }}
-                    }} catch (error) {{
-                        alert('An error occurred. Please try again.');
-                    }}
-                }});
-            </script>
         </body>
         </html>
         """

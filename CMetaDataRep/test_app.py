@@ -177,9 +177,16 @@ def test_missing_required_fields(client):
 
 def test_manage_page_access(client):
     """Test accessing the management page"""
-    response = client.get('/manage')
+    token = get_auth_token(client)
+    response = client.get('/manage',
+                         headers={'Authorization': f'Bearer {token}'})
     assert response.status_code == 200
     assert b'Data Management' in response.data
+
+def test_manage_page_unauthorized(client):
+    """Test accessing management page without authentication"""
+    response = client.get('/manage')
+    assert b'Login Required' in response.data
 
 if __name__ == '__main__':
     pytest.main(['-v'])
