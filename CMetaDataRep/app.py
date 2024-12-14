@@ -169,32 +169,35 @@ def login():
             print(f"Login attempt - Username: {username}, Password: {password}")  # Debug print
             print(f"Available users: {list(users.keys())}")  # Debug print
             
-            if username in users:
-                print(f"User found, stored password: {users[username]['password']}")  # Debug print
-                if users[username]['password'] == password:
-                    print("Password matches!")  # Debug print
-                    token = create_jwt(
-                        user_id=users[username]['user_id'],
-                        role=users[username]['role']
-                    )
-                    print(f"Generated token: {token}")  # Debug print
-                    return jsonify({
-                        'token': token,
-                        'user': {
-                            'username': username,
-                            'role': users[username]['role']
-                        }
-                    }), 200
-                else:
-                    print("Password doesn't match")  # Debug print
-            else:
-                print(f"User {username} not found")  # Debug print
+            if not username or not password:
+                return jsonify({'error': 'Username and password are required'}), 401
             
-            return jsonify({'error': 'Invalid credentials'}), 401
+            if username not in users:
+                print(f"User {username} not found")  # Debug print
+                return jsonify({'error': f'User "{username}" does not exist'}), 401
+            
+            print(f"User found, stored password: {users[username]['password']}")  # Debug print
+            if users[username]['password'] != password:
+                print("Password doesn't match")  # Debug print
+                return jsonify({'error': 'Incorrect password'}), 401
+            
+            print("Password matches!")  # Debug print
+            token = create_jwt(
+                user_id=users[username]['user_id'],
+                role=users[username]['role']
+            )
+            print(f"Generated token: {token}")  # Debug print
+            return jsonify({
+                'token': token,
+                'user': {
+                    'username': username,
+                    'role': users[username]['role']
+                }
+            }), 200
             
         except Exception as e:
             print(f"Login error: {str(e)}")  # Debug print
-            return jsonify({'error': str(e)}), 500
+            return jsonify({'error': 'An error occurred during login. Please try again.'}), 500
 
 # Define a route for the home page
 @app.route('/')
@@ -391,10 +394,17 @@ def create_table_view(data, title):
                 color: #007bff;
                 margin-bottom: 20px;
             }}
+            .table-container {{
+                max-height: 600px;
+                overflow-y: auto;
+                margin-bottom: 20px;
+                border: 1px solid #dee2e6;
+                border-radius: 4px;
+            }}
             table {{
                 width: 100%;
                 border-collapse: collapse;
-                margin-top: 20px;
+                margin-top: 0;
             }}
             th, td {{
                 padding: 12px;
@@ -404,6 +414,9 @@ def create_table_view(data, title):
             th {{
                 background-color: #007bff;
                 color: white;
+                position: sticky;
+                top: 0;
+                z-index: 10;
             }}
             tr:nth-child(even) {{
                 background-color: #f8f9fa;
@@ -425,11 +438,10 @@ def create_table_view(data, title):
                 margin-top: 20px;
                 display: none;
             }}
-            
             .crud-buttons {{
                 margin: 20px 0;
+                display: none;
             }}
-            
             .btn {{
                 padding: 8px 16px;
                 margin-right: 10px;
@@ -438,79 +450,88 @@ def create_table_view(data, title):
                 cursor: pointer;
                 font-size: 14px;
             }}
-            
             .btn-add {{
                 background-color: #28a745;
                 color: white;
             }}
-            
             .btn-edit {{
                 background-color: #ffc107;
                 color: #000;
             }}
-            
             .btn-delete {{
                 background-color: #dc3545;
                 color: white;
             }}
-            
-            .modal {{
-                display: none;
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background-color: rgba(0,0,0,0.5);
+            .auth-section {{
+                text-align: right;
+                margin-bottom: 20px;
             }}
-            
-            .modal-content {{
-                background-color: white;
-                margin: 15% auto;
-                padding: 20px;
-                width: 400px;
-                border-radius: 8px;
-                text-align: center;
-            }}
-            
-            .modal-buttons {{
-                margin-top: 20px;
-                color: #007bff;
-                text-decoration: none;
-            }}
-            
-            .btn-confirm {{
-                background-color: #dc3545;
+            .btn-login {{
+                background-color: #007bff;
                 color: white;
             }}
-            
-            .btn-cancel {{
+            .btn-logout {{
                 background-color: #6c757d;
                 color: white;
+            }}
+            .action-column {{
+                display: none;
+            }}
+            .pagination {{
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                margin-top: 20px;
+                gap: 10px;
+            }}
+            .pagination button {{
+                padding: 8px 12px;
+                border: 1px solid #007bff;
+                background-color: white;
+                color: #007bff;
+                border-radius: 4px;
+                cursor: pointer;
+            }}
+            .pagination button:disabled {{
+                border-color: #ccc;
+                color: #ccc;
+                cursor: not-allowed;
+            }}
+            .pagination button.active {{
+                background-color: #007bff;
+                color: white;
+            }}
+            .pagination-info {{
+                margin: 0 15px;
+                color: #666;
             }}
         </style>
     </head>
     <body>
         <div class="container">
+            <div class="auth-section">
+                <span id="userInfo"></span>
+                <button id="loginBtn" class="btn btn-login" onclick="location.href='/login'" style="display: none;">Login to Edit</button>
+                <button id="logoutBtn" class="btn btn-logout" onclick="logout()" style="display: none;">Logout</button>
+            </div>
             <h2>{title}</h2>
-            
-            <div class="crud-buttons">
+            <div id="crud-buttons" class="crud-buttons">
                 <button class="btn btn-add" onclick="location.href='{get_add_url(title)}'">Add New</button>
             </div>
 
-            <div id="tableContent">
+            <div class="table-container">
                 <table>
                     <thead>
                         <tr>
                             {''.join(f'<th>{header}</th>' for header in headers)}
-                            <th>Actions</th>
+                            <th class="action-column">Actions</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="tableBody">
                         {''.join(
                             f"<tr>"
                             f"{''.join(f'<td>{str(value)}</td>' for value in row.values())}"
-                            f"<td>"
+                            f"<td class='action-column'>"
                             f"<button class='btn btn-edit' onclick='editRecord({json.dumps(row)})'>Edit</button>"
                             f"<button class='btn btn-delete' onclick='showDeleteModal({json.dumps(row[primary_key])})'>Delete</button>"
                             f"</td>"
@@ -520,6 +541,15 @@ def create_table_view(data, title):
                     </tbody>
                 </table>
             </div>
+
+            <div class="pagination">
+                <button onclick="previousPage()" id="prevButton">Previous</button>
+                <span class="pagination-info">
+                    Page <span id="currentPage">1</span> of <span id="totalPages">1</span>
+                </span>
+                <button onclick="nextPage()" id="nextButton">Next</button>
+            </div>
+
             <a href="/" class="back-link">← Back to Home</a>
         </div>
 
@@ -537,8 +567,71 @@ def create_table_view(data, title):
 
         <script>
             let recordToDelete = null;
+            const token = localStorage.getItem('token');
+            const loginBtn = document.getElementById('loginBtn');
+            const logoutBtn = document.getElementById('logoutBtn');
+            const crudButtons = document.getElementById('crud-buttons');
+            const actionColumns = document.getElementsByClassName('action-column');
+            
+            // Pagination variables
+            const rowsPerPage = 25;
+            const rows = Array.from(document.getElementById('tableBody').getElementsByTagName('tr'));
+            let currentPage = 1;
+            const totalPages = Math.ceil(rows.length / rowsPerPage);
+            
+            document.getElementById('totalPages').textContent = totalPages;
+
+            // Function to show rows for current page
+            function showPage(page) {{
+                const start = (page - 1) * rowsPerPage;
+                const end = start + rowsPerPage;
+                
+                rows.forEach((row, index) => {{
+                    row.style.display = (index >= start && index < end) ? '' : 'none';
+                }});
+                
+                document.getElementById('currentPage').textContent = page;
+                document.getElementById('prevButton').disabled = page === 1;
+                document.getElementById('nextButton').disabled = page === totalPages;
+            }}
+
+            function previousPage() {{
+                if (currentPage > 1) {{
+                    currentPage--;
+                    showPage(currentPage);
+                }}
+            }}
+
+            function nextPage() {{
+                if (currentPage < totalPages) {{
+                    currentPage++;
+                    showPage(currentPage);
+                }}
+            }}
+
+            // Initialize first page
+            showPage(1);
+
+            // Check authentication status
+            if (token) {{
+                // Show edit controls for authenticated users
+                logoutBtn.style.display = 'inline-block';
+                crudButtons.style.display = 'block';
+                for (let col of actionColumns) {{
+                    col.style.display = 'table-cell';
+                }}
+            }} else {{
+                // Show login button for unauthenticated users
+                loginBtn.style.display = 'inline-block';
+            }}
+
+            function logout() {{
+                localStorage.removeItem('token');
+                location.reload();
+            }}
 
             function showDeleteModal(id) {{
+                if (!token) return;
                 recordToDelete = id;
                 document.getElementById('deleteModal').style.display = 'block';
             }}
@@ -549,12 +642,20 @@ def create_table_view(data, title):
             }}
 
             function confirmDelete() {{
-                if (recordToDelete === null) return;
+                if (!token || recordToDelete === null) return;
 
-                fetch(`${{window.location.pathname}}/${{recordToDelete}}`, {{
-                    method: 'DELETE'
+                fetch(window.location.pathname + '/' + recordToDelete, {{
+                    method: 'DELETE',
+                    headers: {{
+                        'Authorization': 'Bearer ' + token
+                    }}
                 }})
                 .then(response => {{
+                    if (response.status === 401) {{
+                        localStorage.removeItem('token');
+                        location.reload();
+                        return;
+                    }}
                     if (response.ok) {{
                         window.location.reload();
                     }} else {{
@@ -572,11 +673,11 @@ def create_table_view(data, title):
             }}
 
             function editRecord(record) {{
+                if (!token) return;
                 const url = window.location.pathname + '/edit/' + record['{primary_key}'];
                 window.location.href = url;
             }}
 
-            // Close modal when clicking outside
             window.onclick = function(event) {{
                 const modal = document.getElementById('deleteModal');
                 if (event.target === modal) {{
@@ -607,7 +708,6 @@ def get_add_url(title):
 
 # Update the routes to remove @jwt_required and show data directly
 @app.route('/Attribute', methods=['GET'])
-@jwt_required
 def get_attributes():
     """
     Retrieves all attributes from database
@@ -631,7 +731,101 @@ def get_attributes():
         if connection:
             connection.close()
 
-# POST route to add a new attribute
+@app.route('/Business-Term-Owner', methods=['GET'])
+def get_business_term_owners():
+    """
+    Retrieves all business term owners
+    Returns:
+        HTML: Table view of business term owners
+    """
+    connection = None
+    try:
+        connection = get_db_connection()
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT term_owner_code, term_owner_description 
+                FROM business_term_owner
+            """)
+            owners = cursor.fetchall()
+        return create_table_view(owners, "Business Term Owners")
+    except Exception as e:
+        return f"<h1>Error</h1><p>{str(e)}</p>", 500
+    finally:
+        if connection:
+            connection.close()
+
+@app.route('/Entity', methods=['GET'])
+def get_entities():
+    """
+    Retrieves all entities from database
+    Returns:
+        HTML: Table view of entities
+    """
+    connection = None
+    try:
+        connection = get_db_connection()
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT entity_id, entity_name, entity_description 
+                FROM entity
+            """)
+            entities = cursor.fetchall()
+        return create_table_view(entities, "Entities")
+    except Exception as e:
+        return f"<h1>Error</h1><p>{str(e)}</p>", 500
+    finally:
+        if connection:
+            connection.close()
+
+@app.route('/Glossary-of-Business-Terms', methods=['GET'])
+def get_glossary():
+    """
+    Retrieves all glossary terms
+    Returns:
+        HTML: Table view of glossary terms
+    """
+    connection = None
+    try:
+        connection = get_db_connection()
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT business_term_short_name, 
+                       DATE_FORMAT(date_term_defined, '%Y-%m-%d') as date_term_defined 
+                FROM glossary_of_business_terms
+            """)
+            terms = cursor.fetchall()
+        return create_table_view(terms, "Glossary of Business Terms")
+    except Exception as e:
+        print(f"Error fetching glossary terms: {e}")  # Debug print
+        return f"<h1>Error</h1><p>{str(e)}</p>", 500
+    finally:
+        if connection:
+            connection.close()
+
+@app.route('/Source-Systems', methods=['GET'])
+def get_source_systems():
+    """
+    Retrieves all source systems
+    Returns:
+        HTML: Table view of source systems
+    """
+    connection = None
+    try:
+        connection = get_db_connection()
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT src_system_id, src_system_name 
+                FROM source_systems
+            """)
+            systems = cursor.fetchall()
+        return create_table_view(systems, "Source Systems")
+    except Exception as e:
+        return f"<h1>Error</h1><p>{str(e)}</p>", 500
+    finally:
+        if connection:
+            connection.close()
+
+# Keep @jwt_required for all modification routes (POST, PUT, DELETE)
 @app.route('/Attribute', methods=['POST'])
 @jwt_required
 def add_attribute():
@@ -666,7 +860,6 @@ def add_attribute():
         if connection:
             connection.close()
 
-# PUT route to update an attribute
 @app.route('/Attribute/<int:id>', methods=['PUT'])
 @jwt_required
 def update_attribute(id):
@@ -702,7 +895,6 @@ def update_attribute(id):
         if connection:
             connection.close()
 
-# DELETE route to remove an attribute
 @app.route('/Attribute/<int:id>', methods=['DELETE'])
 @jwt_required
 def delete_attribute(id):
@@ -732,30 +924,6 @@ def delete_attribute(id):
 # ===================================
 # BUSINESS TERM OWNER CRUD OPERATIONS
 # ===================================
-@app.route('/Business-Term-Owner', methods=['GET'])
-@jwt_required
-def get_business_term_owners():
-    """
-    Retrieves all business term owners
-    Returns:
-        HTML: Table view of business term owners
-    """
-    connection = None
-    try:
-        connection = get_db_connection()
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                SELECT term_owner_code, term_owner_description 
-                FROM business_term_owner
-            """)
-            owners = cursor.fetchall()
-        return create_table_view(owners, "Business Term Owners")
-    except Exception as e:
-        return f"<h1>Error</h1><p>{str(e)}</p>", 500
-    finally:
-        if connection:
-            connection.close()
-
 @app.route('/Business-Term-Owner', methods=['POST'])
 @jwt_required
 def add_business_term_owner():
@@ -845,30 +1013,6 @@ def delete_business_term_owner(code):
 # ===================================
 # ENTITY CRUD OPERATIONS
 # ===================================
-@app.route('/Entity', methods=['GET'])
-@jwt_required
-def get_entities():
-    """
-    Retrieves all entities from database
-    Returns:
-        HTML: Table view of entities
-    """
-    connection = None
-    try:
-        connection = get_db_connection()
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                SELECT entity_id, entity_name, entity_description 
-                FROM entity
-            """)
-            entities = cursor.fetchall()
-        return create_table_view(entities, "Entities")
-    except Exception as e:
-        return f"<h1>Error</h1><p>{str(e)}</p>", 500
-    finally:
-        if connection:
-            connection.close()
-
 @app.route('/Entity', methods=['POST'])
 @jwt_required
 def add_entity():
@@ -958,32 +1102,6 @@ def delete_entity(id):
 # ===================================
 # GLOSSARY CRUD OPERATIONS
 # ===================================
-@app.route('/Glossary-of-Business-Terms', methods=['GET'])
-@jwt_required
-def get_glossary():
-    """
-    Retrieves all glossary terms
-    Returns:
-        HTML: Table view of glossary terms
-    """
-    connection = None
-    try:
-        connection = get_db_connection()
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                SELECT business_term_short_name, 
-                       DATE_FORMAT(date_term_defined, '%Y-%m-%d') as date_term_defined 
-                FROM glossary_of_business_terms
-            """)
-            terms = cursor.fetchall()
-        return create_table_view(terms, "Glossary of Business Terms")
-    except Exception as e:
-        print(f"Error fetching glossary terms: {e}")  # Debug print
-        return f"<h1>Error</h1><p>{str(e)}</p>", 500
-    finally:
-        if connection:
-            connection.close()
-
 @app.route('/Glossary-of-Business-Terms', methods=['POST'])
 @jwt_required
 def add_glossary_term():
@@ -1076,30 +1194,6 @@ def delete_glossary_term(name):
 # ===================================
 # SOURCE SYSTEMS CRUD OPERATIONS
 # ===================================
-@app.route('/Source-Systems', methods=['GET'])
-@jwt_required
-def get_source_systems():
-    """
-    Retrieves all source systems
-    Returns:
-        HTML: Table view of source systems
-    """
-    connection = None
-    try:
-        connection = get_db_connection()
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                SELECT src_system_id, src_system_name 
-                FROM source_systems
-            """)
-            systems = cursor.fetchall()
-        return create_table_view(systems, "Source Systems")
-    except Exception as e:
-        return f"<h1>Error</h1><p>{str(e)}</p>", 500
-    finally:
-        if connection:
-            connection.close()
-
 @app.route('/Source-Systems', methods=['POST'])
 @jwt_required
 def add_source_system():
@@ -1196,11 +1290,30 @@ def create_login_form():
                 color: #007bff;
                 text-decoration: none;
             }
+            #errorMessage {
+                color: #dc3545;
+                background-color: #f8d7da;
+                border: 1px solid #f5c6cb;
+                padding: 10px;
+                margin-bottom: 15px;
+                border-radius: 4px;
+                display: none;
+                text-align: center;
+            }
+            .shake {
+                animation: shake 0.5s;
+            }
+            @keyframes shake {
+                0%, 100% { transform: translateX(0); }
+                10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+                20%, 40%, 60%, 80% { transform: translateX(5px); }
+            }
         </style>
     </head>
     <body>
         <div class="login-container">
             <h2>Login Required</h2>
+            <div id="errorMessage"></div>
             <form id="loginForm">
                 <div class="form-group">
                     <label for="username">Username:</label>
@@ -1216,26 +1329,66 @@ def create_login_form():
             <a href="/" class="back-link">← Back to Home</a>
         </div>
         <script>
-            document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            const token = localStorage.getItem('token');
+            if (token) {{
+                fetch('/Attribute', {{
+                    headers: {{
+                        'Authorization': 'Bearer ' + token
+                    }}
+                }})
+                .then(response => {{
+                    if (response.ok) {{
+                        window.history.back();
+                    }} else {{
+                        localStorage.removeItem('token');
+                    }}
+                }});
+            }}
+
+            document.getElementById('loginForm').addEventListener('submit', async (e) => {{
                 e.preventDefault();
-                const response = await fetch('/login', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        username: document.getElementById('username').value,
-                        password: document.getElementById('password').value
-                    })
-                });
-                const data = await response.json();
-                if (data.token) {
-                    localStorage.setItem('token', data.token);
-                    window.location.reload();
-                } else {
-                    alert('Login failed');
-                }
-            });
+                const errorMessage = document.getElementById('errorMessage');
+                const form = document.getElementById('loginForm');
+                errorMessage.style.display = 'none';
+                
+                try {{
+                    const response = await fetch('/login', {{
+                        method: 'POST',
+                        headers: {{
+                            'Content-Type': 'application/json',
+                        }},
+                        body: JSON.stringify({{
+                            username: document.getElementById('username').value,
+                            password: document.getElementById('password').value
+                        }})
+                    }});
+                    
+                    const data = await response.json();
+                    
+                    if (response.ok && data.token) {{
+                        localStorage.setItem('token', data.token);
+                        if (document.referrer && !document.referrer.includes('/login')) {{
+                            window.location.href = document.referrer;
+                        }} else {{
+                            window.location.href = '/';
+                        }}
+                    }} else {{
+                        errorMessage.textContent = data.error || 'Login failed';
+                        errorMessage.style.display = 'block';
+                        form.classList.add('shake');
+                        setTimeout(() => form.classList.remove('shake'), 500);
+                        
+                        // Clear password field on error
+                        document.getElementById('password').value = '';
+                        document.getElementById('password').focus();
+                    }}
+                }} catch (error) {{
+                    errorMessage.textContent = 'An error occurred. Please try again.';
+                    errorMessage.style.display = 'block';
+                    form.classList.add('shake');
+                    setTimeout(() => form.classList.remove('shake'), 500);
+                }}
+            }});
         </script>
     </body>
     </html>
@@ -1612,60 +1765,88 @@ def add_attribute_form():
     </head>
     <body>
         <div class="container">
-            <h2>Add New Attribute</h2>
-            <form id="attributeForm">
-                <div class="form-group">
-                    <label for="attribute_id">Attribute ID:</label>
-                    <input type="number" id="attribute_id" name="attribute_id" required>
-                </div>
-                <div class="form-group">
-                    <label for="attribute_name">Attribute Name:</label>
-                    <input type="text" id="attribute_name" name="attribute_name" required>
-                </div>
-                <div class="form-group">
-                    <label for="attribute_datatype">Data Type:</label>
-                    <select id="attribute_datatype" name="attribute_datatype" required>
-                        <option value="VARCHAR">VARCHAR</option>
-                        <option value="INT">INT</option>
-                        <option value="DATE">DATE</option>
-                        <option value="DECIMAL">DECIMAL</option>
-                        <option value="BOOLEAN">BOOLEAN</option>
-                        <option value="TEXT">TEXT</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="attribute_description">Description:</label>
-                    <textarea id="attribute_description" name="attribute_description" rows="3"></textarea>
-                </div>
-                <div class="form-group">
-                    <label for="typical_values">Typical Values:</label>
-                    <input type="text" id="typical_values" name="typical_values">
-                </div>
-                <div class="form-group">
-                    <label for="validation_criteria">Validation Criteria:</label>
-                    <input type="text" id="validation_criteria" name="validation_criteria">
-                </div>
-                <button type="submit" class="btn btn-primary">Save</button>
-                <button type="button" class="btn btn-secondary" onclick="history.back()">Cancel</button>
-            </form>
+            <div id="loginStatus" style="margin-bottom: 20px;"></div>
+            <div id="formContent" style="display: none;">
+                <h2>Add New Attribute</h2>
+                <form id="attributeForm">
+                    <div class="form-group">
+                        <label for="attribute_id">Attribute ID:</label>
+                        <input type="number" id="attribute_id" name="attribute_id" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="attribute_name">Attribute Name:</label>
+                        <input type="text" id="attribute_name" name="attribute_name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="attribute_datatype">Data Type:</label>
+                        <select id="attribute_datatype" name="attribute_datatype" required>
+                            <option value="VARCHAR">VARCHAR</option>
+                            <option value="INT">INT</option>
+                            <option value="DATE">DATE</option>
+                            <option value="DECIMAL">DECIMAL</option>
+                            <option value="BOOLEAN">BOOLEAN</option>
+                            <option value="TEXT">TEXT</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="attribute_description">Description:</label>
+                        <textarea id="attribute_description" name="attribute_description" rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="typical_values">Typical Values:</label>
+                        <input type="text" id="typical_values" name="typical_values">
+                    </div>
+                    <div class="form-group">
+                        <label for="validation_criteria">Validation Criteria:</label>
+                        <input type="text" id="validation_criteria" name="validation_criteria">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                    <button type="button" class="btn btn-secondary" onclick="history.back()">Cancel</button>
+                </form>
+            </div>
             <a href="/manage" class="back-link">← Back to Management</a>
         </div>
 
         <script>
+            const token = localStorage.getItem('token');
+            const loginStatus = document.getElementById('loginStatus');
+            const formContent = document.getElementById('formContent');
+
+            // Check authentication status
+            if (!token) {
+                loginStatus.innerHTML = 
+                    '<div style="text-align: center; padding: 20px;">' +
+                    '<p>Please log in to access this feature.</p>' +
+                    '<button onclick="location.href=\'/login\'" class="btn btn-primary">Login</button>' +
+                    '</div>';
+            } else {
+                formContent.style.display = 'block';
+                loginStatus.innerHTML = 
+                    '<div style="text-align: right;">' +
+                    '<button onclick="logout()" class="btn btn-secondary">Logout</button>' +
+                    '</div>';
+            }
+
             document.getElementById('attributeForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const formData = new FormData(e.target);
                 const data = Object.fromEntries(formData);
-                const token = localStorage.getItem('token');
                 
                 try {
                     const response = await fetch('/Attribute', {
                         method: 'POST',
                         headers: {
-                            'Content-Type': 'application/json'
+                            'Content-Type': 'application/json',
+                            'Authorization': 'Bearer ' + token
                         },
                         body: JSON.stringify(data)
                     });
+                    
+                    if (response.status === 401) {
+                        localStorage.removeItem('token');
+                        location.href = '/login';
+                        return;
+                    }
                     
                     if (response.ok) {
                         window.location.href = '/Attribute';
@@ -2140,7 +2321,7 @@ def edit_attribute_form(id):
                     const token = localStorage.getItem('token');
                     
                     try {{
-                        const response = await fetch('/Attribute/{id}', {{
+                        const response = await fetch('/Attribute/' + id, {{
                             method: 'PUT',
                             headers: {{
                                 'Content-Type': 'application/json',
