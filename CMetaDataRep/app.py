@@ -5,12 +5,22 @@ import jwt
 from functools import wraps
 import json
 
-# ------------------------------------- Security ----------------------------------
+# ===================================
+# SECURITY AND AUTHENTICATION FUNCTIONS
+# ===================================
 # Secret key used to sign and verify JWT tokens
 SECRET_KEY = 'nioshiii'  # Replace with a strong, unique secret key in production
 
 # Function to create a JWT token
 def create_jwt(user_id, role):
+    """
+    Creates a JWT token for user authentication
+    Args:
+        user_id: User's unique identifier
+        role: User's role (admin, user, etc.)
+    Returns:
+        str: JWT token
+    """
     try:
         payload = {
             'user_id': user_id,
@@ -30,6 +40,13 @@ def create_jwt(user_id, role):
 
 # Function to decode and verify a JWT token
 def decode_jwt(token):
+    """
+    Decodes and verifies a JWT token
+    Args:
+        token: JWT token string
+    Returns:
+        dict: Decoded token payload or error message
+    """
     try:
         return jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
     
@@ -41,6 +58,13 @@ def decode_jwt(token):
 
 # Decorator to protect routes with optional role-based access control
 def jwt_required(f):
+    """
+    Decorator to protect routes with JWT authentication
+    Args:
+        f: Function to be decorated
+    Returns:
+        Function: Decorated function with JWT verification
+    """
     @wraps(f)
     def decorated_function(*args, **kwargs):
         token = request.headers.get('Authorization')
@@ -63,6 +87,9 @@ def jwt_required(f):
 
 app = Flask(__name__)
 
+# ===================================
+# DATABASE CONNECTION
+# ===================================
 # Dictionary to store user credentials
 users = {
     'admin': {
@@ -104,6 +131,11 @@ users = {
 
 # Function to establish a connection to the MySQL database
 def get_db_connection():
+    """
+    Establishes connection to MySQL database
+    Returns:
+        Connection: MySQL database connection object
+    """
     return pymysql.connect(
         host='localhost',  # MySQL host (localhost for local development)
         user='root',  # Database username
@@ -112,9 +144,21 @@ def get_db_connection():
         cursorclass=pymysql.cursors.DictCursor  # Ensures that results are returned as dictionaries
     )
 
+# ===================================
+# VIEW TEMPLATE GENERATORS
+# ===================================
 # Login
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    """
+    Handles user login requests
+    Methods:
+        GET: Returns login form
+        POST: Processes login credentials
+    Returns:
+        GET: HTML login form
+        POST: JSON with token and user info or error message
+    """
     if request.method == 'GET':
         return create_login_form()
         
@@ -293,14 +337,30 @@ def home():
 # Custom error handler for 400 Bad Request
 @app.errorhandler(400)
 def bad_request(error):
+    """
+    Handles bad request errors (400)
+    Args:
+        error: Error details
+    Returns:
+        JSON: Error message with 400 status code
+    """
     # Return a JSON response with an error message and 400 status code
     return jsonify({"error": "Invalid JSON"}), 400
 
 
-# ----------------------------------------- Attribute -----------------------------------------
+# ===================================
+# ATTRIBUTE CRUD OPERATIONS
+# ===================================
 # Add this HTML template for table display
 def create_table_view(data, title):
-    """Create an HTML table view with CRUD operations"""
+    """
+    Generates HTML table view for displaying data
+    Args:
+        data: List of dictionaries containing table data
+        title: Title of the table/page
+    Returns:
+        str: HTML template string
+    """
     if not data:
         return f"""
         <h2>{title}</h2>
@@ -531,7 +591,13 @@ def create_table_view(data, title):
     """
 
 def get_add_url(title):
-    """Get the add URL for a given table title"""
+    """
+    Maps table titles to their corresponding add URLs
+    Args:
+        title: Table/page title
+    Returns:
+        str: URL for adding new records to the table
+    """
     url_mapping = {
         "Attributes": "/Attribute/add",
         "Business Term Owners": "/Business-Term-Owner/add",
@@ -544,6 +610,11 @@ def get_add_url(title):
 # Update the routes to remove @jwt_required and show data directly
 @app.route('/Attribute', methods=['GET'])
 def get_attributes():
+    """
+    Retrieves all attributes from database
+    Returns:
+        HTML: Table view of attributes
+    """
     connection = None
     try:
         connection = get_db_connection()
@@ -565,6 +636,11 @@ def get_attributes():
 @app.route('/Attribute', methods=['POST'])
 @jwt_required
 def add_attribute():
+    """
+    Adds a new attribute to database
+    Returns:
+        JSON: Success/error message
+    """
     data = request.json
     required_fields = ['attribute_id', 'attribute_name', 'attribute_datatype']
     
@@ -595,6 +671,13 @@ def add_attribute():
 @app.route('/Attribute/<int:id>', methods=['PUT'])
 @jwt_required
 def update_attribute(id):
+    """
+    Updates an existing attribute
+    Args:
+        id: Attribute ID to update
+    Returns:
+        JSON: Success/error message
+    """
     data = request.json
     try:
         connection = get_db_connection()
@@ -624,6 +707,13 @@ def update_attribute(id):
 @app.route('/Attribute/<int:id>', methods=['DELETE'])
 @jwt_required
 def delete_attribute(id):
+    """
+    Deletes an attribute from database
+    Args:
+        id: Attribute ID to delete
+    Returns:
+        JSON: Success/error message
+    """
     try:
         connection = get_db_connection()
         with connection.cursor() as cursor:
@@ -640,9 +730,16 @@ def delete_attribute(id):
         if connection:
             connection.close()
 
-# ---------------------------------- Business Term Owner ------------------------------------
+# ===================================
+# BUSINESS TERM OWNER CRUD OPERATIONS
+# ===================================
 @app.route('/Business-Term-Owner', methods=['GET'])
 def get_business_term_owners():
+    """
+    Retrieves all business term owners
+    Returns:
+        HTML: Table view of business term owners
+    """
     connection = None
     try:
         connection = get_db_connection()
@@ -659,10 +756,14 @@ def get_business_term_owners():
         if connection:
             connection.close()
 
-# POST route to add a new business term owner
 @app.route('/Business-Term-Owner', methods=['POST'])
 @jwt_required
 def add_business_term_owner():
+    """
+    Adds a new business term owner to database
+    Returns:
+        JSON: Success/error message
+    """
     data = request.json
     required_fields = ['term_owner_code', 'term_owner_description']
     
@@ -684,10 +785,16 @@ def add_business_term_owner():
         if connection:
             connection.close()
 
-# PUT route to update a business term owner
 @app.route('/Business-Term-Owner/<string:code>', methods=['PUT'])
 @jwt_required
 def update_business_term_owner(code):
+    """
+    Updates an existing business term owner
+    Args:
+        code: Owner code to update
+    Returns:
+        JSON: Success/error message
+    """
     data = request.json
     try:
         connection = get_db_connection()
@@ -709,10 +816,16 @@ def update_business_term_owner(code):
         if connection:
             connection.close()
 
-# DELETE route to remove a business term owner
 @app.route('/Business-Term-Owner/<string:code>', methods=['DELETE'])
 @jwt_required
 def delete_business_term_owner(code):
+    """
+    Deletes a business term owner from database
+    Args:
+        code: Owner code to delete
+    Returns:
+        JSON: Success/error message
+    """
     try:
         connection = get_db_connection()
         with connection.cursor() as cursor:
@@ -729,9 +842,16 @@ def delete_business_term_owner(code):
         if connection:
             connection.close()
 
-# ----------------------------------------- Entity -----------------------------------------
+# ===================================
+# ENTITY CRUD OPERATIONS
+# ===================================
 @app.route('/Entity', methods=['GET'])
 def get_entities():
+    """
+    Retrieves all entities from database
+    Returns:
+        HTML: Table view of entities
+    """
     connection = None
     try:
         connection = get_db_connection()
@@ -748,10 +868,14 @@ def get_entities():
         if connection:
             connection.close()
 
-# POST route to add a new entity
 @app.route('/Entity', methods=['POST'])
 @jwt_required
 def add_entity():
+    """
+    Adds a new entity to database
+    Returns:
+        JSON: Success/error message
+    """
     data = request.json
     required_fields = ['entity_id', 'entity_name']
     
@@ -773,10 +897,16 @@ def add_entity():
         if connection:
             connection.close()
 
-# PUT route to update an entity
 @app.route('/Entity/<int:id>', methods=['PUT'])
 @jwt_required
 def update_entity(id):
+    """
+    Updates an existing entity
+    Args:
+        id: Entity ID to update
+    Returns:
+        JSON: Success/error message
+    """
     data = request.json
     try:
         connection = get_db_connection()
@@ -798,10 +928,16 @@ def update_entity(id):
         if connection:
             connection.close()
 
-# DELETE route to remove an entity
 @app.route('/Entity/<int:id>', methods=['DELETE'])
 @jwt_required
 def delete_entity(id):
+    """
+    Deletes an entity from database
+    Args:
+        id: Entity ID to delete
+    Returns:
+        JSON: Success/error message
+    """
     try:
         connection = get_db_connection()
         with connection.cursor() as cursor:
@@ -818,9 +954,16 @@ def delete_entity(id):
         if connection:
             connection.close()
 
-# -------------------------------- Glossary of Business Terms ------------------------------
+# ===================================
+# GLOSSARY CRUD OPERATIONS
+# ===================================
 @app.route('/Glossary-of-Business-Terms', methods=['GET'])
 def get_glossary():
+    """
+    Retrieves all glossary terms
+    Returns:
+        HTML: Table view of glossary terms
+    """
     connection = None
     try:
         connection = get_db_connection()
@@ -842,6 +985,11 @@ def get_glossary():
 @app.route('/Glossary-of-Business-Terms', methods=['POST'])
 @jwt_required
 def add_glossary_term():
+    """
+    Adds a new glossary term to database
+    Returns:
+        JSON: Success/error message
+    """
     data = request.json
     connection = None
     try:
@@ -866,6 +1014,13 @@ def add_glossary_term():
 @app.route('/Glossary-of-Business-Terms/<string:name>', methods=['PUT'])
 @jwt_required
 def update_glossary_term(name):
+    """
+    Updates an existing glossary term
+    Args:
+        name: Term name to update
+    Returns:
+        JSON: Success/error message
+    """
     data = request.json
     connection = None
     try:
@@ -890,6 +1045,13 @@ def update_glossary_term(name):
 @app.route('/Glossary-of-Business-Terms/<string:name>', methods=['DELETE'])
 @jwt_required
 def delete_glossary_term(name):
+    """
+    Deletes a glossary term from database
+    Args:
+        name: Term name to delete
+    Returns:
+        JSON: Success/error message
+    """
     connection = None
     try:
         connection = get_db_connection()
@@ -909,9 +1071,16 @@ def delete_glossary_term(name):
         if connection:
             connection.close()
 
-# ------------------------------------- Source Systems ------------------------------------
+# ===================================
+# SOURCE SYSTEMS CRUD OPERATIONS
+# ===================================
 @app.route('/Source-Systems', methods=['GET'])
 def get_source_systems():
+    """
+    Retrieves all source systems
+    Returns:
+        HTML: Table view of source systems
+    """
     connection = None
     try:
         connection = get_db_connection()
@@ -928,10 +1097,14 @@ def get_source_systems():
         if connection:
             connection.close()
 
-# POST route to add a new source system
 @app.route('/Source-Systems', methods=['POST'])
 @jwt_required
 def add_source_system():
+    """
+    Adds a new source system to database
+    Returns:
+        JSON: Success/error message
+    """
     data = request.json
     try:
         connection = get_db_connection()
@@ -949,8 +1122,16 @@ def add_source_system():
         if connection:
             connection.close()
 
+# ===================================
+# FORM GENERATORS
+# ===================================
 # Add this login form template
 def create_login_form():
+    """
+    Generates HTML login form
+    Returns:
+        str: HTML template for login form
+    """
     return """
     <!DOCTYPE html>
     <html>
@@ -1059,6 +1240,11 @@ def create_login_form():
 
 # Add this registration form template
 def create_register_form():
+    """
+    Generates HTML registration form
+    Returns:
+        str: HTML template for registration form
+    """
     return """
     <!DOCTYPE html>
     <html>
@@ -1202,6 +1388,15 @@ def create_register_form():
 # Add registration route
 @app.route('/register', methods=['GET', 'POST'])
 def register():
+    """
+    Handles user registration
+    Methods:
+        GET: Returns registration form
+        POST: Processes new user registration
+    Returns:
+        GET: HTML registration form
+        POST: JSON success/error message
+    """
     if request.method == 'GET':
         return create_register_form()
         
@@ -1992,12 +2187,18 @@ def edit_business_term_owner_form(code):
         <head>
             <title>Edit Business Term Owner</title>
             <style>
-                /* Same styles as attribute edit form */
+                {EDIT_FORM_STYLE}
             </style>
         </head>
         <body>
             <div class="container">
+                <div class="nav-links">
+                    <a href="/">Home</a>
+                    <a href="/Business-Term-Owner">Back to Business Term Owners</a>
+                    <a href="/manage">Management</a>
+                </div>
                 <h2>Edit Business Term Owner</h2>
+                <p id="errorMessage" class="error-message"></p>
                 <form id="editForm">
                     <div class="form-group">
                         <label for="term_owner_description">Description:</label>
@@ -2126,13 +2327,24 @@ def edit_glossary_term_form(name):
         <head>
             <title>Edit Glossary Term</title>
             <style>
-                /* Same styles as attribute edit form */
+                {EDIT_FORM_STYLE}
             </style>
         </head>
         <body>
             <div class="container">
+                <div class="nav-links">
+                    <a href="/">Home</a>
+                    <a href="/Glossary-of-Business-Terms">Back to Glossary Terms</a>
+                    <a href="/manage">Management</a>
+                </div>
                 <h2>Edit Glossary Term</h2>
+                <p id="errorMessage" class="error-message"></p>
                 <form id="editForm">
+                    <div class="form-group">
+                        <label for="business_term_short_name">Term Name:</label>
+                        <input type="text" id="business_term_short_name" name="business_term_short_name" 
+                               value="{term['business_term_short_name']}" readonly>
+                    </div>
                     <div class="form-group">
                         <label for="date_term_defined">Date Defined:</label>
                         <input type="date" id="date_term_defined" name="date_term_defined" 
@@ -2202,13 +2414,24 @@ def edit_source_system_form(id):
         <head>
             <title>Edit Source System</title>
             <style>
-                /* Same styles as attribute edit form */
+                {EDIT_FORM_STYLE}
             </style>
         </head>
         <body>
             <div class="container">
+                <div class="nav-links">
+                    <a href="/">Home</a>
+                    <a href="/Source-Systems">Back to Source Systems</a>
+                    <a href="/manage">Management</a>
+                </div>
                 <h2>Edit Source System</h2>
+                <p id="errorMessage" class="error-message"></p>
                 <form id="editForm">
+                    <div class="form-group">
+                        <label for="src_system_id">System ID:</label>
+                        <input type="number" id="src_system_id" name="src_system_id" 
+                               value="{system['src_system_id']}" readonly>
+                    </div>
                     <div class="form-group">
                         <label for="src_system_name">System Name:</label>
                         <input type="text" id="src_system_name" name="src_system_name" 
@@ -2259,3 +2482,6 @@ def edit_source_system_form(id):
 
 if __name__ == '__main__':
     app.run(debug=True)
+
+
+
