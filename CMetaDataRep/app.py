@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, request
 import pymysql
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import jwt
 from functools import wraps
 import json
@@ -25,7 +25,7 @@ def create_jwt(user_id, role):
         payload = {
             'user_id': user_id,
             'role': role,
-            'exp': datetime.utcnow() + timedelta(hours=1)
+            'exp': datetime.now(timezone.utc) + timedelta(hours=1)
         }
         token = jwt.encode(
             payload,
@@ -70,17 +70,15 @@ def jwt_required(f):
         token = request.headers.get('Authorization')
         
         if not token:
-            return create_login_form()
+            return jsonify({'error': 'No token provided'}), 401
         
         try:
-            token = token.split(" ")[1]
+            token = token.split(" ")[1]  # Remove 'Bearer ' prefix
             decoded_token = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
             request.user = decoded_token
             return f(*args, **kwargs)
-        except jwt.ExpiredSignatureError:
-            return create_login_form()
-        except jwt.InvalidTokenError:
-            return create_login_form()
+        except (jwt.ExpiredSignatureError, jwt.InvalidTokenError, IndexError):
+            return jsonify({'error': 'Invalid token'}), 401
             
     return decorated_function
 
@@ -97,35 +95,35 @@ users = {
         'role': 'admin',
         'user_id': 1,
         'email': 'admin@example.com',
-        'created_at': datetime.utcnow()
+        'created_at': datetime.now(timezone.utc)
     },
     'user': {
         'password': 'user123',
         'role': 'user',
         'user_id': 2,
         'email': 'user@example.com',
-        'created_at': datetime.utcnow()
+        'created_at': datetime.now(timezone.utc)
     },
     'manager': {
         'password': 'manager123',
         'role': 'manager',
         'user_id': 3,
         'email': 'manager@example.com',
-        'created_at': datetime.utcnow()
+        'created_at': datetime.now(timezone.utc)
     },
     'analyst': {
         'password': 'analyst123',
         'role': 'analyst',
         'user_id': 4,
         'email': 'analyst@example.com',
-        'created_at': datetime.utcnow()
+        'created_at': datetime.now(timezone.utc)
     },
     'viewer': {
         'password': 'viewer123',
         'role': 'viewer',
         'user_id': 5,
         'email': 'viewer@example.com',
-        'created_at': datetime.utcnow()
+        'created_at': datetime.now(timezone.utc)
     }
 }
 
@@ -609,6 +607,7 @@ def get_add_url(title):
 
 # Update the routes to remove @jwt_required and show data directly
 @app.route('/Attribute', methods=['GET'])
+@jwt_required
 def get_attributes():
     """
     Retrieves all attributes from database
@@ -734,6 +733,7 @@ def delete_attribute(id):
 # BUSINESS TERM OWNER CRUD OPERATIONS
 # ===================================
 @app.route('/Business-Term-Owner', methods=['GET'])
+@jwt_required
 def get_business_term_owners():
     """
     Retrieves all business term owners
@@ -846,6 +846,7 @@ def delete_business_term_owner(code):
 # ENTITY CRUD OPERATIONS
 # ===================================
 @app.route('/Entity', methods=['GET'])
+@jwt_required
 def get_entities():
     """
     Retrieves all entities from database
@@ -958,6 +959,7 @@ def delete_entity(id):
 # GLOSSARY CRUD OPERATIONS
 # ===================================
 @app.route('/Glossary-of-Business-Terms', methods=['GET'])
+@jwt_required
 def get_glossary():
     """
     Retrieves all glossary terms
@@ -1028,7 +1030,7 @@ def update_glossary_term(name):
         with connection.cursor() as cursor:
             cursor.execute("""
                 UPDATE glossary_of_business_terms 
-                SET date_term_defined = STR_TO_DATE(%s, '%Y-%m-%d')
+                SET date_term_defined = %s
                 WHERE business_term_short_name = %s
             """, (data['date_term_defined'], name))
             connection.commit()
@@ -1075,6 +1077,7 @@ def delete_glossary_term(name):
 # SOURCE SYSTEMS CRUD OPERATIONS
 # ===================================
 @app.route('/Source-Systems', methods=['GET'])
+@jwt_required
 def get_source_systems():
     """
     Retrieves all source systems
