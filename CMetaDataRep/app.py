@@ -663,10 +663,15 @@ def create_table_view(data, title):
                 loginBtn.style.display = 'inline-block';
             }}
 
+            // Function to log out the user
             function logout() {{
-                localStorage.removeItem('token');
-                location.reload();
+                localStorage.removeItem('token'); // Remove the token from local storage
+                alert('You have been logged out.');
+                window.location.href = '/login';  // Redirect to login page
             }}
+
+            // Attach the logout function to the logout button
+            document.getElementById('logoutBtn').addEventListener('click', logout);
 
             // Function to show the delete modal
             function showDeleteModal(id) {{

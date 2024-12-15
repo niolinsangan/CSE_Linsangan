@@ -3,6 +3,7 @@ import json
 from app import app
 import pymysql
 from datetime import datetime, timedelta, timezone
+import jwt
 
 # ===================================
 # TEST FIXTURES
@@ -70,6 +71,9 @@ def get_auth_token(client):
     data = json.loads(response.data)
     assert 'token' in data, f"No token in response: {data}"
     return data['token']
+
+def create_jwt(payload, secret):
+    return jwt.encode(payload, secret, algorithm='HS256')
 
 # ===================================
 # AUTHENTICATION TESTS
@@ -383,6 +387,7 @@ def test_invalid_token(client):
     response = client.get('/Attribute',
                          headers={'Authorization': 'Bearer invalid_token'})
     assert response.status_code == 401
+    assert b'Invalid token' in response.data
 
 if __name__ == '__main__':
     pytest.main(['-v'])
