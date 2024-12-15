@@ -756,28 +756,13 @@ def get_add_url(title):
 
 # Update the routes to remove @jwt_required and show data directly
 @app.route('/Attribute', methods=['GET'])
+@jwt_required
 def get_attributes():
-    """
-    Retrieves all attributes from database
-    Returns:
-        HTML: Table view of attributes
-    """
-    connection = None
     try:
-        connection = get_db_connection()
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                SELECT attribute_id, attribute_name, attribute_datatype, 
-                       attribute_description, typical_values, validation_criteria 
-                FROM attribute
-            """)
-            attributes = cursor.fetchall()
-        return create_table_view(attributes, "Attributes")
+        attributes = execute_query("SELECT * FROM attribute", fetch=True)
+        return jsonify(attributes), 200
     except Exception as e:
-        return f"<h1>Error</h1><p>{str(e)}</p>", 500
-    finally:
-        if connection:
-            connection.close()
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/Business-Term-Owner', methods=['GET'])
 def get_business_term_owners():
@@ -903,13 +888,6 @@ def add_attribute():
 @app.route('/Attribute/<int:id>', methods=['PUT'])
 @jwt_required
 def update_attribute(id):
-    """
-    Updates an existing attribute
-    Args:
-        id: Attribute ID to update
-    Returns:
-        JSON: Success/error message
-    """
     data = request.json
     try:
         result = execute_query("SELECT * FROM attribute WHERE attribute_id = %s", (id,), fetch=True)
@@ -932,13 +910,6 @@ def update_attribute(id):
 @app.route('/Attribute/<int:id>', methods=['DELETE'])
 @jwt_required
 def delete_attribute(id):
-    """
-    Deletes an attribute from database
-    Args:
-        id: Attribute ID to delete
-    Returns:
-        JSON: Success/error message
-    """
     try:
         result = execute_query("SELECT * FROM attribute WHERE attribute_id = %s", (id,), fetch=True)
         if not result:
