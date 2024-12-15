@@ -16,9 +16,6 @@ def client():
 
 
 
-iifififif
-
-
 @pytest.fixture(scope='session')
 def test_db():
     """Create a database connection for testing"""
