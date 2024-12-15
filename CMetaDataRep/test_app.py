@@ -110,11 +110,10 @@ def test_register_new_user(client):
 # ===================================
 def test_get_attributes(client, test_db):
     """Test retrieving attributes"""
-    # Insert test data
     with test_db.cursor() as cursor:
         cursor.execute("""
-            INSERT INTO attribute 
-            (attribute_id, attribute_name, attribute_datatype) 
+            INSERT INTO attribute
+            (attribute_id, attribute_name, attribute_datatype)
             VALUES (1, 'Test Attribute', 'VARCHAR')
         """)
         test_db.commit()
@@ -122,7 +121,9 @@ def test_get_attributes(client, test_db):
     token = get_auth_token(client)
     response = client.get('/Attribute',
                          headers={'Authorization': f'Bearer {token}'})
+    print(response.data)  # Add this line to see the actual response data
     assert response.status_code == 200
+    assert b'Test Attribute' in response.data
     assert b'Test Attribute' in response.data
 
 def test_add_attribute(client):

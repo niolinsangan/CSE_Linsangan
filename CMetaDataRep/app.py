@@ -315,6 +315,30 @@ def home():
                 border-radius: 8px;
                 box-shadow: 0 2px 4px rgba(0,0,0,0.05);
             }
+            .auth-buttons {
+                display: flex;
+                gap: 10px;
+            }
+            .auth-buttons a, .auth-buttons button {
+                color: white;
+                text-decoration: none;
+                padding: 5px 10px;
+                border-radius: 4px;
+                transition: background-color 0.3s;
+                border: none;
+                cursor: pointer;
+                font-size: 14px;
+            }
+            .login-btn {
+                background-color: rgba(255,255,255,0.1);
+            }
+            .logout-btn {
+                background-color: #dc3545;
+                display: none;  /* Hidden by default */
+            }
+            .auth-buttons a:hover, .auth-buttons button:hover {
+                background-color: rgba(255,255,255,0.2);
+            }
         </style>
     </head>
     <body>
@@ -327,7 +351,11 @@ def home():
                     <a href="/Entity">Entity</a>
                     <a href="/Glossary-of-Business-Terms">Glossary of Business Terms</a>
                     <a href="/Source-Systems">Source Systems</a>
-                    <a href="/login">Login</a>
+                    <a href="/manage">Data Management</a>
+                    <div class="auth-buttons">
+                        <a href="/login" id="loginBtn" class="login-btn">Login</a>
+                        <button id="logoutBtn" class="logout-btn" onclick="logout()">Logout</button>
+                    </div>
                 </nav>
             </div>
         </header>
@@ -368,6 +396,27 @@ def home():
                 <p style="margin-top: 40px;">Use the navigation links above to access different modules of the system.</p>
             </div>
         </main>
+        <script>
+            // Check if user is logged in
+            const token = localStorage.getItem('token');
+            const loginBtn = document.getElementById('loginBtn');
+            const logoutBtn = document.getElementById('logoutBtn');
+            
+            if (token) {
+                loginBtn.style.display = 'none';
+                logoutBtn.style.display = 'block';
+            } else {
+                loginBtn.style.display = 'block';
+                logoutBtn.style.display = 'none';
+            }
+
+            // Logout function
+            function logout() {
+                localStorage.removeItem('token');
+                alert('You have been logged out.');
+                window.location.reload();
+            }
+        </script>
     </body>
     </html>
     """
@@ -756,111 +805,61 @@ def get_add_url(title):
 
 # Update the routes to remove @jwt_required and show data directly
 @app.route('/Attribute', methods=['GET'])
-@jwt_required
 def get_attributes():
-    try:
-        attributes = execute_query("SELECT * FROM attribute", fetch=True)
-        return jsonify(attributes), 200
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    if request.headers.get('Accept') == 'application/json':
+        try:
+            attributes = execute_query("SELECT * FROM attribute", fetch=True)
+            return jsonify(attributes), 200
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+    return create_api_table_view("Attributes")
 
 @app.route('/Business-Term-Owner', methods=['GET'])
 def get_business_term_owners():
-    """
-    Retrieves all business term owners
-    Returns:
-        HTML: Table view of business term owners
-    """
-    connection = None
-    try:
-        connection = get_db_connection()
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                SELECT term_owner_code, term_owner_description 
-                FROM business_term_owner
-            """)
-            owners = cursor.fetchall()
-        return create_table_view(owners, "Business Term Owners")
-    except Exception as e:
-        return f"<h1>Error</h1><p>{str(e)}</p>", 500
-    finally:
-        if connection:
-            connection.close()
+    if request.headers.get('Accept') == 'application/json':
+        try:
+            owners = execute_query("SELECT * FROM business_term_owner", fetch=True)
+            return jsonify(owners), 200
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+    return create_api_table_view("Business Term Owners")
 
 @app.route('/Entity', methods=['GET'])
 def get_entities():
-    """
-    Retrieves all entities from database
-    Returns:
-        HTML: Table view of entities
-    """
-    connection = None
-    try:
-        connection = get_db_connection()
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                SELECT entity_id, entity_name, entity_description 
-                FROM entity
-            """)
-            entities = cursor.fetchall()
-        return create_table_view(entities, "Entities")
-    except Exception as e:
-        return f"<h1>Error</h1><p>{str(e)}</p>", 500
-    finally:
-        if connection:
-            connection.close()
+    if request.headers.get('Accept') == 'application/json':
+        try:
+            entities = execute_query("SELECT * FROM entity", fetch=True)
+            return jsonify(entities), 200
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+    return create_api_table_view("Entities")
 
 @app.route('/Glossary-of-Business-Terms', methods=['GET'])
 def get_glossary():
-    """
-    Retrieves all glossary terms
-    Returns:
-        HTML: Table view of glossary terms
-    """
-    connection = None
-    try:
-        connection = get_db_connection()
-        with connection.cursor() as cursor:
-            cursor.execute("""
+    if request.headers.get('Accept') == 'application/json':
+        try:
+            terms = execute_query("""
                 SELECT business_term_short_name, 
                        DATE_FORMAT(date_term_defined, '%Y-%m-%d') as date_term_defined 
                 FROM glossary_of_business_terms
-            """)
-            terms = cursor.fetchall()
-        return create_table_view(terms, "Glossary of Business Terms")
-    except Exception as e:
-        print(f"Error fetching glossary terms: {e}")  # Debug print
-        return f"<h1>Error</h1><p>{str(e)}</p>", 500
-    finally:
-        if connection:
-            connection.close()
+            """, fetch=True)
+            return jsonify(terms), 200
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+    return create_api_table_view("Glossary of Business Terms")
 
 @app.route('/Source-Systems', methods=['GET'])
 def get_source_systems():
-    """
-    Retrieves all source systems
-    Returns:
-        HTML: Table view of source systems
-    """
-    connection = None
-    try:
-        connection = get_db_connection()
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                SELECT src_system_id, src_system_name 
-                FROM source_systems
-            """)
-            systems = cursor.fetchall()
-        return create_table_view(systems, "Source Systems")
-    except Exception as e:
-        return f"<h1>Error</h1><p>{str(e)}</p>", 500
-    finally:
-        if connection:
-            connection.close()
+    if request.headers.get('Accept') == 'application/json':
+        try:
+            systems = execute_query("SELECT * FROM source_systems", fetch=True)
+            return jsonify(systems), 200
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+    return create_api_table_view("Source Systems")
 
-# Keep @jwt_required for all modification routes (POST, PUT, DELETE)
+# Remove @jwt_required from these routes
 @app.route('/Attribute', methods=['POST'])
-@jwt_required
 def add_attribute():
     """
     Adds a new attribute to database
@@ -886,7 +885,6 @@ def add_attribute():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/Attribute/<int:id>', methods=['PUT'])
-@jwt_required
 def update_attribute(id):
     data = request.json
     try:
@@ -908,7 +906,6 @@ def update_attribute(id):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/Attribute/<int:id>', methods=['DELETE'])
-@jwt_required
 def delete_attribute(id):
     try:
         result = execute_query("SELECT * FROM attribute WHERE attribute_id = %s", (id,), fetch=True)
@@ -924,7 +921,6 @@ def delete_attribute(id):
 # BUSINESS TERM OWNER CRUD OPERATIONS
 # ===================================
 @app.route('/Business-Term-Owner', methods=['POST'])
-@jwt_required
 def add_business_term_owner():
     """
     Adds a new business term owner to database
@@ -947,7 +943,6 @@ def add_business_term_owner():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/Business-Term-Owner/<string:code>', methods=['PUT'])
-@jwt_required
 def update_business_term_owner(code):
     """
     Updates an existing business term owner
@@ -972,15 +967,7 @@ def update_business_term_owner(code):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/Business-Term-Owner/<string:code>', methods=['DELETE'])
-@jwt_required
 def delete_business_term_owner(code):
-    """
-    Deletes a business term owner from database
-    Args:
-        code: Owner code to delete
-    Returns:
-        JSON: Success/error message
-    """
     try:
         result = execute_query("SELECT * FROM business_term_owner WHERE term_owner_code = %s", (code,), fetch=True)
         if not result:
@@ -995,7 +982,6 @@ def delete_business_term_owner(code):
 # ENTITY CRUD OPERATIONS
 # ===================================
 @app.route('/Entity', methods=['POST'])
-@jwt_required
 def add_entity():
     """
     Adds a new entity to database
@@ -1018,14 +1004,9 @@ def add_entity():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/Entity/<int:id>', methods=['PUT'])
-@jwt_required
 def update_entity(id):
     """
     Updates an existing entity
-    Args:
-        id: Entity ID to update
-    Returns:
-        JSON: Success/error message
     """
     data = request.json
     try:
@@ -1043,15 +1024,7 @@ def update_entity(id):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/Entity/<int:id>', methods=['DELETE'])
-@jwt_required
 def delete_entity(id):
-    """
-    Deletes an entity from database
-    Args:
-        id: Entity ID to delete
-    Returns:
-        JSON: Success/error message
-    """
     try:
         result = execute_query("SELECT * FROM entity WHERE entity_id = %s", (id,), fetch=True)
         if not result:
@@ -1066,104 +1039,60 @@ def delete_entity(id):
 # GLOSSARY CRUD OPERATIONS
 # ===================================
 @app.route('/Glossary-of-Business-Terms', methods=['POST'])
-@jwt_required
 def add_glossary_term():
     """
     Adds a new glossary term to database
-    Returns:
-        JSON: Success/error message
     """
     data = request.json
-    connection = None
     try:
-        connection = get_db_connection()
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                INSERT INTO glossary_of_business_terms 
-                (business_term_short_name, date_term_defined)
-                VALUES (%s, STR_TO_DATE(%s, '%Y-%m-%d'))
-            """, (data['business_term_short_name'], data['date_term_defined']))
-            connection.commit()
+        execute_query("""
+            INSERT INTO glossary_of_business_terms 
+            (business_term_short_name, date_term_defined)
+            VALUES (%s, STR_TO_DATE(%s, '%Y-%m-%d'))
+        """, (data['business_term_short_name'], data['date_term_defined']))
         return jsonify({'message': 'Term added successfully'}), 201
     except Exception as e:
-        print(f"Error adding glossary term: {e}")  # Debug print
-        if connection:
-            connection.rollback()
         return jsonify({'error': str(e)}), 500
-    finally:
-        if connection:
-            connection.close()
 
 @app.route('/Glossary-of-Business-Terms/<string:name>', methods=['PUT'])
-@jwt_required
 def update_glossary_term(name):
     """
     Updates an existing glossary term
-    Args:
-        name: Term name to update
-    Returns:
-        JSON: Success/error message
     """
     data = request.json
-    connection = None
     try:
-        connection = get_db_connection()
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                UPDATE glossary_of_business_terms 
-                SET date_term_defined = %s
-                WHERE business_term_short_name = %s
-            """, (data['date_term_defined'], name))
-            connection.commit()
+        result = execute_query("SELECT * FROM glossary_of_business_terms WHERE business_term_short_name = %s", (name,), fetch=True)
+        if not result:
+            return jsonify({'error': 'Glossary Term not found'}), 404
+        
+        execute_query("""
+            UPDATE glossary_of_business_terms 
+            SET date_term_defined = STR_TO_DATE(%s, '%Y-%m-%d')
+            WHERE business_term_short_name = %s
+        """, (data['date_term_defined'], name))
         return jsonify({'message': 'Term updated successfully'}), 200
     except Exception as e:
-        print(f"Error updating glossary term: {e}")  # Debug print
-        if connection:
-            connection.rollback()
         return jsonify({'error': str(e)}), 500
-    finally:
-        if connection:
-            connection.close()
 
 @app.route('/Glossary-of-Business-Terms/<string:name>', methods=['DELETE'])
-@jwt_required
 def delete_glossary_term(name):
-    """
-    Deletes a glossary term from database
-    Args:
-        name: Term name to delete
-    Returns:
-        JSON: Success/error message
-    """
-    connection = None
     try:
-        connection = get_db_connection()
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                DELETE FROM glossary_of_business_terms 
-                WHERE business_term_short_name = %s
-            """, (name,))
-            connection.commit()
-        return jsonify({'message': 'Term deleted successfully'}), 200
+        result = execute_query("SELECT * FROM glossary_of_business_terms WHERE business_term_short_name = %s", (name,), fetch=True)
+        if not result:
+            return jsonify({'error': 'Glossary Term not found'}), 404
+        
+        execute_query("DELETE FROM glossary_of_business_terms WHERE business_term_short_name = %s", (name,))
+        return jsonify({'message': 'Glossary Term deleted successfully'}), 200
     except Exception as e:
-        print(f"Error deleting glossary term: {e}")  # Debug print
-        if connection:
-            connection.rollback()
         return jsonify({'error': str(e)}), 500
-    finally:
-        if connection:
-            connection.close()
 
 # ===================================
 # SOURCE SYSTEMS CRUD OPERATIONS
 # ===================================
 @app.route('/Source-Systems', methods=['POST'])
-@jwt_required
 def add_source_system():
     """
     Adds a new source system to database
-    Returns:
-        JSON: Success/error message
     """
     data = request.json
     try:
@@ -1541,394 +1470,25 @@ def register():
 # Add these routes for CRUD operations
 @app.route('/Attribute/add', methods=['GET'])
 def add_attribute_form():
-    return """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Add Attribute</title>
-        <style>
-            body {
-                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                margin: 20px;
-                background-color: #f5f5f5;
-            }
-            .container {
-                max-width: 600px;
-                margin: 0 auto;
-                background-color: white;
-                padding: 20px;
-                border-radius: 8px;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            }
-            h2 {
-                color: #007bff;
-                margin-bottom: 20px;
-            }
-            .form-group {
-                margin-bottom: 15px;
-            }
-            label {
-                display: block;
-                margin-bottom: 5px;
-                color: #666;
-            }
-            input, select, textarea {
-                width: 100%;
-                padding: 8px;
-                border: 1px solid #ddd;
-                border-radius: 4px;
-                box-sizing: border-box;
-            }
-            .btn {
-                padding: 10px 20px;
-                border: none;
-                border-radius: 4px;
-                cursor: pointer;
-                font-size: 14px;
-                margin-right: 10px;
-            }
-            .btn-primary {
-                background-color: #007bff;
-                color: white;
-            }
-            .btn-secondary {
-                background-color: #6c757d;
-                color: white;
-            }
-            .back-link {
-                display: inline-block;
-                margin-top: 20px;
-                color: #007bff;
-                text-decoration: none;
-            }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <div id="loginStatus" style="margin-bottom: 20px;"></div>
-            <div id="formContent" style="display: none;">
-                <h2>Add New Attribute</h2>
-                <form id="attributeForm">
-                    <div class="form-group">
-                        <label for="attribute_id">Attribute ID:</label>
-                        <input type="number" id="attribute_id" name="attribute_id" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="attribute_name">Attribute Name:</label>
-                        <input type="text" id="attribute_name" name="attribute_name" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="attribute_datatype">Data Type:</label>
-                        <select id="attribute_datatype" name="attribute_datatype" required>
-                            <option value="VARCHAR">VARCHAR</option>
-                            <option value="INT">INT</option>
-                            <option value="DATE">DATE</option>
-                            <option value="DECIMAL">DECIMAL</option>
-                            <option value="BOOLEAN">BOOLEAN</option>
-                            <option value="TEXT">TEXT</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="attribute_description">Description:</label>
-                        <textarea id="attribute_description" name="attribute_description" rows="3"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label for="typical_values">Typical Values:</label>
-                        <input type="text" id="typical_values" name="typical_values">
-                    </div>
-                    <div class="form-group">
-                        <label for="validation_criteria">Validation Criteria:</label>
-                        <input type="text" id="validation_criteria" name="validation_criteria">
-                    </div>
-                  <button type="submit" class="btn btn-primary">Save</button>
-                    <button type="button" class="btn btn-secondary" onclick="history.back()">Cancel</button>
-                </form>
-            </div>
-            <a href="/manage" class="back-link">← Back to Management</a>
-        </div>
-
-        <script>
-            const token = localStorage.getItem('token');
-            const loginStatus = document.getElementById('loginStatus');
-            const formContent = document.getElementById('formContent');
-
-            // Check authentication status
-            if (!token) {
-                loginStatus.innerHTML = 
-                    '<div style="text-align: center; padding: 20px;">' +
-                    '<p>Please log in to access this feature.</p>' +
-                    '<button onclick="location.href=\'/login\'" class="btn btn-primary">Login</button>' +
-                    '</div>';
-            } else {
-                formContent.style.display = 'block';
-                loginStatus.innerHTML = 
-                    '<div style="text-align: right;">' +
-                    '<button onclick="logout()" class="btn btn-secondary">Logout</button>' +
-                    '</div>';
-            }
-
-            document.getElementById('attributeForm').addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const formData = new FormData(e.target);
-                const data = Object.fromEntries(formData);
-                
-                try {
-                    const response = await fetch('/Attribute', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': 'Bearer ' + token
-                        },
-                        body: JSON.stringify(data)
-                    });
-                    
-                    if (response.status === 401) {
-                        localStorage.removeItem('token');
-                        location.href = '/login';
-                        return;
-                    }
-                    
-                    if (response.ok) {
-                        window.location.href = '/Attribute';
-                    } else {
-                        const error = await response.json();
-                        alert(error.error || 'Failed to add attribute');
-                    }
-                } catch (error) {
-                    alert('An error occurred. Please try again.');
-                }
-            });
-        </script>
-    </body>
-    </html>
-    """
+    return create_add_form("Attribute")
 
 @app.route('/Business-Term-Owner/add', methods=['GET'])
 def add_business_term_owner_form():
-    return """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Add Business Term Owner</title>
-        <style>
-            body {
-                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                margin: 20px;
-                background-color: #f5f5f5;
-            }
-            .container {
-                max-width: 600px;
-                margin: 0 auto;
-                background-color: white;
-                padding: 20px;
-                border-radius: 8px;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            }
-            h2 {
-                color: #007bff;
-                margin-bottom: 20px;
-            }
-            .form-group {
-                margin-bottom: 15px;
-            }
-            label {
-                display: block;
-                margin-bottom: 5px;
-                color: #666;
-            }
-            input, select, textarea {
-                width: 100%;
-                padding: 8px;
-                border: 1px solid #ddd;
-                border-radius: 4px;
-                box-sizing: border-box;
-            }
-            .btn {
-                padding: 10px 20px;
-                border: none;
-                border-radius: 4px;
-                cursor: pointer;
-                font-size: 14px;
-                margin-right: 10px;
-            }
-            .btn-primary {
-                background-color: #007bff;
-                color: white;
-            }
-            .btn-secondary {
-                background-color: #6c757d;
-                color: white;
-            }
-            .back-link {
-                display: inline-block;
-                margin-top: 20px;
-                color: #007bff;
-                text-decoration: none;
-            }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h2>Add New Business Term Owner</h2>
-            <form id="ownerForm">
-                <div class="form-group">
-                    <label for="term_owner_code">Owner Code:</label>
-                    <input type="text" id="term_owner_code" name="term_owner_code" required>
-                </div>
-                <div class="form-group">
-                    <label for="term_owner_description">Description:</label>
-                    <textarea id="term_owner_description" name="term_owner_description" rows="3" required></textarea>
-                </div>
-                <button type="submit" class="btn btn-primary">Save</button>
-                <button type="button" class="btn btn-secondary" onclick="history.back()">Cancel</button>
-            </form>
-            <a href="/manage" class="back-link">← Back to Management</a>
-        </div>
+    return create_add_form("Business-Term-Owner")
 
-        <script>
-            document.getElementById('ownerForm').addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const formData = new FormData(e.target);
-                const data = Object.fromEntries(formData);
-                const token = localStorage.getItem('token');
-                
-                try {
-                    const response = await fetch('/Business-Term-Owner', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(data)
-                    });
-                    
-                    if (response.ok) {
-                        window.location.href = '/Business-Term-Owner';
-                    } else {
-                        const error = await response.json();
-                        alert(error.error || 'Failed to add business term owner');
-                    }
-                } catch (error) {
-                    alert('An error occurred. Please try again.');
-                }
-            });
-        </script>
-    </body>
-    </html>
-    """
-
-# Add these routes for Entity CRUD
 @app.route('/Entity/add', methods=['GET'])
 def add_entity_form():
-    return """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Add Entity</title>
-        <style>
-            /* Same styles as other forms */
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h2>Add New Entity</h2>
-            <form id="entityForm">
-                <div class="form-group">
-                    <label for="entity_id">Entity ID:</label>
-                    <input type="number" id="entity_id" name="entity_id" required>
-                </div>
-                <div class="form-group">
-                    <label for="entity_name">Entity Name:</label>
-                    <input type="text" id="entity_name" name="entity_name" required>
-                </div>
-                <div class="form-group">
-                    <label for="entity_description">Description:</label>
-                    <textarea id="entity_description" name="entity_description" rows="3"></textarea>
-                </div>
-                <button type="submit" class="btn btn-primary">Save</button>
-                <button type="button" class="btn btn-secondary" onclick="history.back()">Cancel</button>
-            </form>
-            <a href="/manage" class="back-link">← Back to Management</a>
-        </div>
-        <script>
-            // Add form submission handler
-        </script>
-    </body>
-    </html>
-    """
+    return create_add_form("Entity")
 
-# Add routes for Glossary CRUD
 @app.route('/Glossary-of-Business-Terms/add', methods=['GET'])
-def add_glossary_form():
-    return """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Add Glossary Term</title>
-        <style>
-            /* Same styles as other forms */
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h2>Add New Glossary Term</h2>
-            <form id="glossaryForm">
-                <div class="form-group">
-                    <label for="business_term_short_name">Term Name:</label>
-                    <input type="text" id="business_term_short_name" name="business_term_short_name" required>
-                </div>
-                <div class="form-group">
-                    <label for="date_term_defined">Date Defined:</label>
-                    <input type="date" id="date_term_defined" name="date_term_defined" required>
-                </div>
-                <button type="submit" class="btn btn-primary">Save</button>
-                <button type="button" class="btn btn-secondary" onclick="history.back()">Cancel</button>
-            </form>
-            <a href="/manage" class="back-link">← Back to Management</a>
-        </div>
-        <script>
-            // Add form submission handler
-        </script>
-    </body>
-    </html>
-    """
+def add_glossary_term_form():
+    return create_add_form("Glossary-of-Business-Terms")
 
-# Add routes for Source Systems CRUD
 @app.route('/Source-Systems/add', methods=['GET'])
 def add_source_system_form():
-    return """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Add Source System</title>
-        <style>
-            /* Same styles as other forms */
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h2>Add New Source System</h2>
-            <form id="sourceSystemForm">
-                <div class="form-group">
-                    <label for="src_system_id">System ID:</label>
-                    <input type="number" id="src_system_id" name="src_system_id" required>
-                </div>
-                <div class="form-group">
-                    <label for="src_system_name">System Name:</label>
-                    <input type="text" id="src_system_name" name="src_system_name" required>
-                </div>
-                <button type="submit" class="btn btn-primary">Save</button>
-                <button type="button" class="btn btn-secondary" onclick="history.back()">Cancel</button>
-            </form>
-            <a href="/manage" class="back-link">← Back to Management</a>
-        </div>
-        <script>
-            // Add form submission handler
-        </script>
-    </body>
-    </html>
-    """
+    return create_add_form("Source-Systems")
 
-# Add this common style for all edit forms
+# Add these common style for all edit forms
 EDIT_FORM_STYLE = """
     body {
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -2503,6 +2063,806 @@ def edit_source_system_form(id):
     finally:
         if connection:
             connection.close()
+
+def create_api_table_view(title):
+    """
+    Creates an HTML template that will fetch and display JSON data
+    """
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>{title}</title>
+        <style>
+            body {{
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                margin: 20px;
+                background-color: #f5f5f5;
+            }}
+            .container {{
+                max-width: 1200px;
+                margin: 0 auto;
+                background-color: white;
+                padding: 20px;
+                border-radius: 8px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }}
+            h2 {{
+                color: #007bff;
+                margin-bottom: 20px;
+            }}
+            .table-container {{
+                overflow-x: auto;
+            }}
+            table {{
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 20px;
+            }}
+            th, td {{
+                padding: 12px;
+                text-align: left;
+                border-bottom: 1px solid #ddd;
+            }}
+            th {{
+                background-color: #007bff;
+                color: white;
+            }}
+            tr:nth-child(even) {{
+                background-color: #f8f9fa;
+            }}
+            tr:hover {{
+                background-color: #f2f2f2;
+            }}
+            .back-link {{
+                display: inline-block;
+                margin-top: 20px;
+                color: #007bff;
+                text-decoration: none;
+            }}
+            .loading {{
+                text-align: center;
+                padding: 20px;
+            }}
+            .error {{
+                color: #dc3545;
+                padding: 20px;
+                text-align: center;
+            }}
+            .header-actions {{
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 20px;
+            }}
+            .logout-btn {{
+                padding: 8px 16px;
+                background-color: #dc3545;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                display: none;  /* Hidden by default */
+            }}
+            .logout-btn:hover {{
+                background-color: #c82333;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header-actions">
+                <h2>{title}</h2>
+                <button id="logoutBtn" class="logout-btn" onclick="logout()">Logout</button>
+            </div>
+            <div class="table-container">
+                <div id="loading" class="loading">Loading...</div>
+                <div id="error" class="error" style="display: none;"></div>
+                <table id="dataTable" style="display: none;">
+                    <thead>
+                        <tr id="headerRow"></tr>
+                    </thead>
+                    <tbody id="tableBody"></tbody>
+                </table>
+            </div>
+            <a href="/" class="back-link">← Back to Home</a>
+        </div>
+
+        <script>
+            // Check if user is logged in
+            const token = localStorage.getItem('token');
+            const logoutBtn = document.getElementById('logoutBtn');
+            
+            if (token) {{
+                logoutBtn.style.display = 'block';  // Show logout button if token exists
+            }}
+
+            // Logout function
+            function logout() {{
+                localStorage.removeItem('token');
+                alert('You have been logged out.');
+                window.location.href = '/login';
+            }}
+
+            // Fetch data from the API with Accept header
+            fetch(window.location.pathname, {{
+                headers: {{
+                    'Accept': 'application/json'
+                }}
+            }})
+            .then(response => response.json())
+            .then(data => {{
+                const table = document.getElementById('dataTable');
+                const headerRow = document.getElementById('headerRow');
+                const tableBody = document.getElementById('tableBody');
+                const loading = document.getElementById('loading');
+                
+                if (data.length > 0) {{
+                    // Create headers
+                    Object.keys(data[0]).forEach(key => {{
+                        const th = document.createElement('th');
+                        th.textContent = key.replace(/_/g, ' ').toUpperCase();
+                        headerRow.appendChild(th);
+                    }});
+
+                    // Create rows
+                    data.forEach(item => {{
+                        const row = document.createElement('tr');
+                        Object.values(item).forEach(value => {{
+                            const td = document.createElement('td');
+                            td.textContent = value;
+                            row.appendChild(td);
+                        }});
+                        tableBody.appendChild(row);
+                    }});
+
+                    loading.style.display = 'none';
+                    table.style.display = 'table';
+                }} else {{
+                    loading.textContent = 'No data available.';
+                }}
+            }})
+            .catch(error => {{
+                const errorDiv = document.getElementById('error');
+                const loading = document.getElementById('loading');
+                loading.style.display = 'none';
+                errorDiv.style.display = 'block';
+                errorDiv.textContent = 'Error loading data: ' + error.message;
+            }});
+        </script>
+    </body>
+    </html>
+    """
+
+@app.route('/some_protected_route', methods=['GET'])
+def some_protected_route():
+    token = request.headers.get('Authorization')
+    if not token or not validate_token(token):
+        return jsonify({'error': 'Unauthorized'}), 401
+    # Proceed with the rest of the logic
+
+@app.route('/manage')
+def manage_data():
+    return """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Data Management</title>
+        <style>
+            body {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                margin: 20px;
+                background-color: #f5f5f5;
+            }
+            .container {
+                max-width: 1200px;
+                margin: 0 auto;
+                background-color: white;
+                padding: 20px;
+                border-radius: 8px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            h2 {
+                color: #007bff;
+                margin-bottom: 20px;
+            }
+            .controls {
+                margin-bottom: 20px;
+                display: flex;
+                gap: 10px;
+                align-items: center;
+            }
+            select, button {
+                padding: 8px;
+                border-radius: 4px;
+                border: 1px solid #ddd;
+            }
+            button {
+                background-color: #007bff;
+                color: white;
+                border: none;
+                cursor: pointer;
+            }
+            button:hover {
+                background-color: #0056b3;
+            }
+            .table-container {
+                overflow-x: auto;
+                margin-top: 20px;
+            }
+            table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+            th, td {
+                padding: 12px;
+                text-align: left;
+                border-bottom: 1px solid #ddd;
+            }
+            th {
+                background-color: #007bff;
+                color: white;
+            }
+            tr:nth-child(even) {
+                background-color: #f8f9fa;
+            }
+            .action-buttons {
+                display: flex;
+                gap: 5px;
+            }
+            .edit-btn {
+                background-color: #ffc107;
+                color: black;
+            }
+            .delete-btn {
+                background-color: #dc3545;
+                color: white;
+            }
+            .back-link {
+                display: inline-block;
+                margin-top: 20px;
+                color: #007bff;
+                text-decoration: none;
+            }
+            .action-buttons button {
+                padding: 5px 10px;
+                margin: 0 2px;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+            }
+            .edit-btn {
+                background-color: #ffc107;
+                color: black;
+            }
+            .delete-btn {
+                background-color: #dc3545;
+                color: white;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h2>Data Management</h2>
+            <div class="controls">
+                <select id="tableSelect" onchange="loadTableData()">
+                    <option value="">Select a table</option>
+                    <option value="Attribute">Attributes</option>
+                    <option value="Business-Term-Owner">Business Term Owners</option>
+                    <option value="Entity">Entities</option>
+                    <option value="Glossary-of-Business-Terms">Glossary Terms</option>
+                    <option value="Source-Systems">Source Systems</option>
+                </select>
+                <button onclick="addNew()">Add New</button>
+            </div>
+            <div class="table-container">
+                <table id="dataTable">
+                    <thead>
+                        <tr id="headerRow"></tr>
+                    </thead>
+                    <tbody id="tableBody"></tbody>
+                </table>
+            </div>
+            <a href="/" class="back-link">← Back to Home</a>
+        </div>
+
+        <script>
+            const tableSelect = document.getElementById('tableSelect');
+            const dataTable = document.getElementById('dataTable');
+            const headerRow = document.getElementById('headerRow');
+            const tableBody = document.getElementById('tableBody');
+
+            function editItem(table, item) {
+                // Get the primary key value based on the table
+                let id;
+                switch(table) {
+                    case 'Attribute':
+                        id = item.attribute_id;
+                        break;
+                    case 'Business-Term-Owner':
+                        id = item.term_owner_code;
+                        break;
+                    case 'Entity':
+                        id = item.entity_id;
+                        break;
+                    case 'Glossary-of-Business-Terms':
+                        id = item.business_term_short_name;
+                        break;
+                    case 'Source-Systems':
+                        id = item.src_system_id;
+                        break;
+                    default:
+                        console.error('Unknown table:', table);
+                        return;
+                }
+
+                window.location.href = `/${table}/edit/${id}`;
+            }
+
+            function deleteItem(table, item) {
+                if (!confirm('Are you sure you want to delete this item?')) return;
+
+                // Get the primary key value based on the table
+                let id;
+                switch(table) {
+                    case 'Attribute':
+                        id = item.attribute_id;
+                        break;
+                    case 'Business-Term-Owner':
+                        id = item.term_owner_code;
+                        break;
+                    case 'Entity':
+                        id = item.entity_id;
+                        break;
+                    case 'Glossary-of-Business-Terms':
+                        id = item.business_term_short_name;
+                        break;
+                    case 'Source-Systems':
+                        id = item.src_system_id;
+                        break;
+                    default:
+                        console.error('Unknown table:', table);
+                        return;
+                }
+
+                fetch(`/${table}/${id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    }
+                })
+                .then(response => {
+                    if (response.ok) {
+                        loadTableData(); // Reload the table after successful deletion
+                        alert('Item deleted successfully');
+                    } else {
+                        return response.json().then(data => {
+                            throw new Error(data.error || 'Failed to delete item');
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert(error.message || 'Error deleting item');
+                });
+            }
+
+            // Update loadTableData to include action buttons
+            function loadTableData() {
+                const selectedTable = tableSelect.value;
+                if (!selectedTable) {
+                    headerRow.innerHTML = '';
+                    tableBody.innerHTML = '';
+                    return;
+                }
+
+                fetch('/' + selectedTable, {
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    headerRow.innerHTML = '';
+                    tableBody.innerHTML = '';
+
+                    if (data.length > 0) {
+                        // Add headers
+                        Object.keys(data[0]).forEach(key => {
+                            const th = document.createElement('th');
+                            th.textContent = key.replace(/_/g, ' ').toUpperCase();
+                            headerRow.appendChild(th);
+                        });
+
+                        // Add actions header
+                        const actionsHeader = document.createElement('th');
+                        actionsHeader.textContent = 'ACTIONS';
+                        headerRow.appendChild(actionsHeader);
+
+                        // Add rows
+                        data.forEach(item => {
+                            const row = document.createElement('tr');
+                            
+                            // Add data cells
+                            Object.values(item).forEach(value => {
+                                const td = document.createElement('td');
+                                td.textContent = value;
+                                row.appendChild(td);
+                            });
+                            
+                            // Add action buttons
+                            const actionsTd = document.createElement('td');
+                            actionsTd.className = 'action-buttons';
+                            
+                            const editBtn = document.createElement('button');
+                            editBtn.className = 'edit-btn';
+                            editBtn.textContent = 'Edit';
+                            editBtn.onclick = () => editItem(selectedTable, item);
+                            
+                            const deleteBtn = document.createElement('button');
+                            deleteBtn.className = 'delete-btn';
+                            deleteBtn.textContent = 'Delete';
+                            deleteBtn.onclick = () => deleteItem(selectedTable, item);
+                            
+                            actionsTd.appendChild(editBtn);
+                            actionsTd.appendChild(deleteBtn);
+                            row.appendChild(actionsTd);
+                            
+                            tableBody.appendChild(row);
+                        });
+
+                        dataTable.style.display = 'table';
+                    } else {
+                        tableBody.innerHTML = '<tr><td colspan="100%">No data available</td></tr>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    tableBody.innerHTML = '<tr><td colspan="100%">Error loading data</td></tr>';
+                });
+            }
+
+            function addNew() {
+                const selectedTable = tableSelect.value;
+                if (!selectedTable) {
+                    alert('Please select a table first');
+                    return;
+                }
+                window.location.href = '/' + selectedTable + '/add';
+            }
+        </script>
+    </body>
+    </html>
+    """
+
+def create_add_form(table_type):
+    """
+    Creates an HTML form for adding new records based on table type
+    """
+    form_fields = {
+        'Attribute': [
+            {'name': 'attribute_id', 'type': 'number', 'label': 'Attribute ID'},
+            {'name': 'attribute_name', 'type': 'text', 'label': 'Attribute Name'},
+            {'name': 'attribute_datatype', 'type': 'text', 'label': 'Data Type'},
+            {'name': 'attribute_description', 'type': 'text', 'label': 'Description'},
+            {'name': 'typical_values', 'type': 'text', 'label': 'Typical Values'},
+            {'name': 'validation_criteria', 'type': 'text', 'label': 'Validation Criteria'}
+        ],
+        'Business-Term-Owner': [
+            {'name': 'term_owner_code', 'type': 'text', 'label': 'Owner Code'},
+            {'name': 'term_owner_description', 'type': 'text', 'label': 'Description'}
+        ],
+        'Entity': [
+            {'name': 'entity_id', 'type': 'number', 'label': 'Entity ID'},
+            {'name': 'entity_name', 'type': 'text', 'label': 'Entity Name'},
+            {'name': 'entity_description', 'type': 'text', 'label': 'Description'}
+        ],
+        'Glossary-of-Business-Terms': [
+            {'name': 'business_term_short_name', 'type': 'text', 'label': 'Term Name'},
+            {'name': 'date_term_defined', 'type': 'date', 'label': 'Date Defined'}
+        ],
+        'Source-Systems': [
+            {'name': 'src_system_id', 'type': 'number', 'label': 'System ID'},
+            {'name': 'src_system_name', 'type': 'text', 'label': 'System Name'}
+        ]
+    }
+
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Add {table_type}</title>
+        <style>
+            body {{
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                margin: 20px;
+                background-color: #f5f5f5;
+            }}
+            .container {{
+                max-width: 600px;
+                margin: 0 auto;
+                background-color: white;
+                padding: 20px;
+                border-radius: 8px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }}
+            h2 {{
+                color: #007bff;
+                margin-bottom: 20px;
+            }}
+            .form-group {{
+                margin-bottom: 15px;
+            }}
+            label {{
+                display: block;
+                margin-bottom: 5px;
+                color: #666;
+            }}
+            input, select {{
+                width: 100%;
+                padding: 8px;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                box-sizing: border-box;
+            }}
+            button {{
+                padding: 10px 20px;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                margin-right: 10px;
+            }}
+            .btn-primary {{
+                background-color: #007bff;
+                color: white;
+            }}
+            .btn-secondary {{
+                background-color: #6c757d;
+                color: white;
+            }}
+            .back-link {{
+                display: inline-block;
+                margin-top: 20px;
+                color: #007bff;
+                text-decoration: none;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h2>Add New {table_type}</h2>
+            <form id="addForm">
+                {
+                    ''.join(
+                        f'''
+                        <div class="form-group">
+                            <label for="{field['name']}">{field['label']}:</label>
+                            <input type="{field['type']}" id="{field['name']}" 
+                                   name="{field['name']}" required>
+                        </div>
+                        '''
+                        for field in form_fields[table_type]
+                    )
+                }
+                <button type="submit" class="btn btn-primary">Save</button>
+                <button type="button" class="btn btn-secondary" onclick="history.back()">Cancel</button>
+            </form>
+            <a href="/manage" class="back-link">← Back to Management</a>
+        </div>
+
+        <script>
+            document.getElementById('addForm').addEventListener('submit', async (e) => {{
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const data = Object.fromEntries(formData);
+                
+                try {{
+                    const response = await fetch(window.location.pathname.replace('/add', ''), {{
+                        method: 'POST',
+                        headers: {{
+                            'Content-Type': 'application/json'
+                        }},
+                        body: JSON.stringify(data)
+                    }});
+                    
+                    if (response.ok) {{
+                        window.location.href = '/manage';
+                    }} else {{
+                        const error = await response.json();
+                        alert(error.error || 'Failed to add item');
+                    }}
+                }} catch (error) {{
+                    alert('An error occurred. Please try again.');
+                }}
+            }});
+        </script>
+    </body>
+    </html>
+    """
+
+# Add routes for the add forms
+@app.route('/<table>/add', methods=['GET'])
+def add_form(table):
+    return create_add_form(table)
+
+def create_edit_form(table_type, item):
+    """
+    Creates an HTML form for editing records based on table type
+    """
+    form_fields = {
+        'Attribute': [
+            {'name': 'attribute_id', 'type': 'number', 'label': 'Attribute ID', 'readonly': True},
+            {'name': 'attribute_name', 'type': 'text', 'label': 'Attribute Name'},
+            {'name': 'attribute_datatype', 'type': 'text', 'label': 'Data Type'},
+            {'name': 'attribute_description', 'type': 'text', 'label': 'Description'},
+            {'name': 'typical_values', 'type': 'text', 'label': 'Typical Values'},
+            {'name': 'validation_criteria', 'type': 'text', 'label': 'Validation Criteria'}
+        ],
+        'Business-Term-Owner': [
+            {'name': 'term_owner_code', 'type': 'text', 'label': 'Owner Code', 'readonly': True},
+            {'name': 'term_owner_description', 'type': 'text', 'label': 'Description'}
+        ],
+        'Entity': [
+            {'name': 'entity_id', 'type': 'number', 'label': 'Entity ID', 'readonly': True},
+            {'name': 'entity_name', 'type': 'text', 'label': 'Entity Name'},
+            {'name': 'entity_description', 'type': 'text', 'label': 'Description'}
+        ],
+        'Glossary-of-Business-Terms': [
+            {'name': 'business_term_short_name', 'type': 'text', 'label': 'Term Name', 'readonly': True},
+            {'name': 'date_term_defined', 'type': 'date', 'label': 'Date Defined'}
+        ],
+        'Source-Systems': [
+            {'name': 'src_system_id', 'type': 'number', 'label': 'System ID', 'readonly': True},
+            {'name': 'src_system_name', 'type': 'text', 'label': 'System Name'}
+        ]
+    }
+
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Edit {table_type}</title>
+        <style>
+            body {{
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                margin: 20px;
+                background-color: #f5f5f5;
+            }}
+            .container {{
+                max-width: 600px;
+                margin: 0 auto;
+                background-color: white;
+                padding: 20px;
+                border-radius: 8px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }}
+            h2 {{
+                color: #007bff;
+                margin-bottom: 20px;
+            }}
+            .form-group {{
+                margin-bottom: 15px;
+            }}
+            label {{
+                display: block;
+                margin-bottom: 5px;
+                color: #666;
+            }}
+            input, select {{
+                width: 100%;
+                padding: 8px;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                box-sizing: border-box;
+            }}
+            input[readonly] {{
+                background-color: #e9ecef;
+            }}
+            button {{
+                padding: 10px 20px;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                margin-right: 10px;
+            }}
+            .btn-primary {{
+                background-color: #007bff;
+                color: white;
+            }}
+            .btn-secondary {{
+                background-color: #6c757d;
+                color: white;
+            }}
+            .back-link {{
+                display: inline-block;
+                margin-top: 20px;
+                color: #007bff;
+                text-decoration: none;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h2>Edit {table_type}</h2>
+            <form id="editForm">
+                {
+                    ''.join(
+                        f'''
+                        <div class="form-group">
+                            <label for="{field['name']}">{field['label']}:</label>
+                            <input type="{field['type']}" 
+                                   id="{field['name']}" 
+                                   name="{field['name']}" 
+                                   value="{item.get(field['name'], '')}"
+                                   {'readonly' if field.get('readonly') else ''}
+                                   required>
+                        </div>
+                        '''
+                        for field in form_fields[table_type]
+                    )
+                }
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+                <button type="button" class="btn btn-secondary" onclick="history.back()">Cancel</button>
+            </form>
+            <a href="/manage" class="back-link">← Back to Management</a>
+        </div>
+
+        <script>
+            document.getElementById('editForm').addEventListener('submit', async (e) => {{
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const data = Object.fromEntries(formData);
+                
+                try {{
+                    const response = await fetch(window.location.pathname.replace('/edit', ''), {{
+                        method: 'PUT',
+                        headers: {{
+                            'Content-Type': 'application/json'
+                        }},
+                        body: JSON.stringify(data)
+                    }});
+                    
+                    if (response.ok) {{
+                        window.location.href = '/manage';
+                    }} else {{
+                        const error = await response.json();
+                        alert(error.error || 'Failed to update item');
+                    }}
+                }} catch (error) {{
+                    alert('An error occurred. Please try again.');
+                }}
+            }});
+        </script>
+    </body>
+    </html>
+    """
+
+# Add route for edit forms
+@app.route('/<table>/edit/<id>', methods=['GET'])
+def edit_form(table, id):
+    try:
+        # Get the item data based on the table type and ID
+        query_map = {
+            'Attribute': ("SELECT * FROM attribute WHERE attribute_id = %s", int(id)),
+            'Business-Term-Owner': ("SELECT * FROM business_term_owner WHERE term_owner_code = %s", id),
+            'Entity': ("SELECT * FROM entity WHERE entity_id = %s", int(id)),
+            'Glossary-of-Business-Terms': ("SELECT * FROM glossary_of_business_terms WHERE business_term_short_name = %s", id),
+            'Source-Systems': ("SELECT * FROM source_systems WHERE src_system_id = %s", int(id))
+        }
+        
+        if table not in query_map:
+            return "Invalid table type", 400
+            
+        query, param = query_map[table]
+        result = execute_query(query, (param,), fetch=True)
+        
+        if not result:
+            return "Item not found", 404
+            
+        return create_edit_form(table, result[0])
+    except Exception as e:
+        return f"Error: {str(e)}", 500
 
 if __name__ == '__main__':
     app.run(debug=True)
