@@ -185,6 +185,27 @@ def setup_database():
                 ('PROC', 'Process Term'),
                 ('KPI', 'Performance Indicator'),
                 ('REG', 'Regulatory Term')
+                ('FIN', 'Financial Term'),
+                ('HR', 'Human Resources Term'),
+                ('MKT', 'Marketing Term'),
+                ('IT', 'Information Technology Term'),
+                ('OPS', 'Operations Term'),
+                ('SALES', 'Sales Term'),
+                ('LEGAL', 'Legal Term'),
+                ('RISK', 'Risk Management Term'),
+                ('COMPLIANCE', 'Compliance Term'),
+                ('SUPPLY', 'Supply Chain Term'),
+                ('CUSTOMER', 'Customer Service Term'),
+                ('PRODUCT', 'Product Management Term'),
+                ('PROJECT', 'Project Management Term'),
+                ('STRATEGY', 'Strategic Planning Term'),
+                ('INNOVATION', 'Innovation Term'),
+                ('BRAND', 'Brand Management Term'),
+                ('DATA', 'Data Management Term'),
+                ('ANALYTICS', 'Analytics Term'),
+                ('RESEARCH', 'Research and Development Term'),
+                ('QUALITY', 'Quality Assurance Term')
+
             """)
 
             connection.commit()

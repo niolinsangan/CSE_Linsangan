@@ -609,6 +609,7 @@ def create_table_view(data, title):
             const logoutBtn = document.getElementById('logoutBtn');
             const crudButtons = document.getElementById('crud-buttons');
             const actionColumns = document.getElementsByClassName('action-column');
+            const deleteModal = document.getElementById('deleteModal');
             
             // Pagination variables
             const rowsPerPage = 5;
@@ -667,17 +668,20 @@ def create_table_view(data, title):
                 location.reload();
             }}
 
+            // Function to show the delete modal
             function showDeleteModal(id) {{
                 if (!token) return;
                 recordToDelete = id;
-                document.getElementById('deleteModal').style.display = 'block';
+                deleteModal.style.display = 'block';
             }}
 
+            // Function to hide the delete modal
             function hideDeleteModal() {{
-                document.getElementById('deleteModal').style.display = 'none';
+                deleteModal.style.display = 'none';
                 recordToDelete = null;
             }}
 
+            // Function to confirm deletion
             function confirmDelete() {{
                 if (!token || recordToDelete === null) return;
 
@@ -689,7 +693,9 @@ def create_table_view(data, title):
                 }})
                 .then(response => {{
                     if (response.status === 401) {{
+                        // Token is invalid or expired, log out the user
                         localStorage.removeItem('token');
+                        alert('Session expired. Please log in again.');
                         location.reload();
                         return;
                     }}
@@ -715,9 +721,9 @@ def create_table_view(data, title):
                 window.location.href = url;
             }}
 
+            // Close the modal when clicking outside of it
             window.onclick = function(event) {{
-                const modal = document.getElementById('deleteModal');
-                if (event.target === modal) {{
+                if (event.target === deleteModal) {{
                     hideDeleteModal();
                 }}
             }}

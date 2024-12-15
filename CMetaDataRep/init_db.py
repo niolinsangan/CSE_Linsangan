@@ -24,8 +24,13 @@ def initialize_database():
             """)
             # Add more initial data as needed
             connection.commit()
+    except Exception as e:
+        print(f"Error initializing database: {e}")
+        if connection:
+            connection.rollback()
     finally:
-        connection.close()
+        if connection:
+            connection.close()
 
 if __name__ == '__main__':
     initialize_database() 
