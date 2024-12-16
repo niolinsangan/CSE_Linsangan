@@ -75,8 +75,7 @@ To run the tests for the application, follow these steps:
 2. **Run the tests**:
    Run the following command to execute the test suite:
    ```bash
-   
-  python test_app.py
+   python test_app.py
    ```
 
    This will run all the tests and show you a detailed result.
