@@ -76,7 +76,8 @@ def jwt_required(f):
             token = token.split(" ")[1]  # Remove 'Bearer ' prefix
             decoded_token = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
             request.user = decoded_token
-            return f(*args, **kwargs)
+            result = f(*args, **kwargs)
+            return result
         except (jwt.ExpiredSignatureError, jwt.InvalidTokenError, IndexError):
             return jsonify({'error': 'Invalid token'}), 401
             
@@ -805,6 +806,7 @@ def get_add_url(title):
 
 # Update the routes to remove @jwt_required and show data directly
 @app.route('/Attribute', methods=['GET'])
+@jwt_required
 def get_attributes():
     if request.headers.get('Accept') == 'application/json':
         try:
@@ -815,6 +817,7 @@ def get_attributes():
     return create_api_table_view("Attributes")
 
 @app.route('/Business-Term-Owner', methods=['GET'])
+@jwt_required
 def get_business_term_owners():
     if request.headers.get('Accept') == 'application/json':
         try:
@@ -825,6 +828,7 @@ def get_business_term_owners():
     return create_api_table_view("Business Term Owners")
 
 @app.route('/Entity', methods=['GET'])
+@jwt_required
 def get_entities():
     if request.headers.get('Accept') == 'application/json':
         try:
@@ -835,6 +839,7 @@ def get_entities():
     return create_api_table_view("Entities")
 
 @app.route('/Glossary-of-Business-Terms', methods=['GET'])
+@jwt_required
 def get_glossary():
     if request.headers.get('Accept') == 'application/json':
         try:
@@ -849,6 +854,7 @@ def get_glossary():
     return create_api_table_view("Glossary of Business Terms")
 
 @app.route('/Source-Systems', methods=['GET'])
+@jwt_required
 def get_source_systems():
     if request.headers.get('Accept') == 'application/json':
         try:
@@ -1055,23 +1061,26 @@ def add_glossary_term():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/Glossary-of-Business-Terms/<string:name>', methods=['PUT'])
+@jwt_required
 def update_glossary_term(name):
-    """
-    Updates an existing glossary term
-    """
     data = request.json
     try:
-        result = execute_query("SELECT * FROM glossary_of_business_terms WHERE business_term_short_name = %s", (name,), fetch=True)
+        result = execute_query(
+            "SELECT * FROM glossary_of_business_terms WHERE business_term_short_name = %s",
+            (name,),
+            fetch=True
+        )
         if not result:
-            return jsonify({'error': 'Glossary Term not found'}), 404
+            return jsonify({'error': 'Term not found'}), 404
         
         execute_query("""
             UPDATE glossary_of_business_terms 
-            SET date_term_defined = STR_TO_DATE(%s, '%Y-%m-%d')
+            SET date_term_defined = STR_TO_DATE(%s, '%%Y-%%m-%%d')
             WHERE business_term_short_name = %s
         """, (data['date_term_defined'], name))
         return jsonify({'message': 'Term updated successfully'}), 200
     except Exception as e:
+        print(f"Database error: {str(e)}")  # Debug print
         return jsonify({'error': str(e)}), 500
 
 @app.route('/Glossary-of-Business-Terms/<string:name>', methods=['DELETE'])

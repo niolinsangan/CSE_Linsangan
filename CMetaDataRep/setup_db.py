@@ -1,6 +1,7 @@
 import pymysql
 from faker import Faker
 
+
 def get_db_connection():
     return pymysql.connect(
         host='localhost',
